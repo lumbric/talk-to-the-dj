@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spotify DJ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>Spotify DJ</h1>
+    <p class="subtitle">Build a playlist, then let tracks flow in order.</p>
+
+    <div class="mode-toggle" role="group" aria-label="Playback mode">
+      <button id="modeSDKBtn" type="button" class="mode-btn mode-active">Browser Player</button>
+      <button id="modeConnectBtn" type="button" class="mode-btn">Spotify Connect</button>
+    </div>
+
+    <div class="controls">
+      <input id="songInput" type="text" placeholder="Add a song (title or artist)" />
+      <button id="addBtn" type="button">Add to Playlist</button>
+      <button id="playPauseBtn" type="button" disabled>Play</button>
+    </div>
+
+    <div class="transport">
+      <button id="nextBtn" type="button" disabled>Next Track</button>
+      <button id="clearBtn" type="button">Clear Playlist</button>
+    </div>
+
+    <div id="devicePanel" class="device-panel hidden">
+      <label for="deviceSelect">Target device</label>
+      <div class="device-row">
+        <select id="deviceSelect" class="device-select"><option value="">-- select a device --</option></select>
+        <button id="refreshDevicesBtn" type="button">Refresh</button>
+      </div>
+      <p class="connect-note">Set crossfade in Spotify app settings &rarr; Playback &rarr; Crossfade for native overlap between tracks.</p>
+    </div>
+
+    <div id="crossfadePanel" class="crossfade-panel">
+      <label for="crossfadeInput">Crossfade overlap (seconds)</label>
+      <input id="crossfadeInput" type="number" min="0" max="12" step="1" value="6" />
+    </div>
+
+    <p id="timeReadout" class="time-readout" aria-live="polite">Elapsed 0:00 | Remaining -0:00</p>
+
+    <section class="playlist-panel" aria-label="Playlist queue">
+      <h2>Playlist</h2>
+      <ol id="playlist" class="playlist"></ol>
+    </section>
+
+    <button id="connectBtn" type="button" class="connect">Connect Spotify</button>
+    <p id="status" class="status">Not connected.</p>
+  </main>
+
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
