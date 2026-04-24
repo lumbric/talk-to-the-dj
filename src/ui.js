@@ -24,6 +24,7 @@ export function createUI(store, actions) {
     playPauseBtn: document.getElementById("playPauseBtn"),
     nextBtn: document.getElementById("nextBtn"),
     clearBtn: document.getElementById("clearBtn"),
+    exportHistoryBtn: document.getElementById("exportHistoryBtn"),
     crossfadeInput: document.getElementById("crossfadeInput"),
     crossfadePanel: document.getElementById("crossfadePanel"),
     devicePanel: document.getElementById("devicePanel"),
@@ -36,6 +37,8 @@ export function createUI(store, actions) {
     remainingTime: document.getElementById("remainingTime"),
     progressFill: document.getElementById("progressFill"),
     playlist: document.getElementById("playlist"),
+    previousHistoryList: document.getElementById("previousHistoryList"),
+    previousCount: document.getElementById("previousCount"),
     connectBtn: document.getElementById("connectBtn"),
     status: document.getElementById("status"),
     errorToast: document.getElementById("errorToast"),
@@ -56,6 +59,19 @@ export function createUI(store, actions) {
     }
   }
 
+  function formatTimestamp(isoString) {
+    if (!isoString) {
+      return "-";
+    }
+
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return date.toLocaleString();
+  }
+
   function renderPlaylist(state) {
     if (!state.playlist.length) {
       elements.playlist.innerHTML = "<li class=\"playlist-empty\">Track Queue is empty. Search above and add your first track.</li>";
@@ -73,6 +89,7 @@ export function createUI(store, actions) {
         const albumMeta = track.albumName || "Unknown album";
         const popularityMeta = Number.isFinite(track.popularity) ? `Popularity ${track.popularity}` : "";
         const meta = [albumMeta, releaseYear, popularityMeta].filter(Boolean).join(" · ");
+        const queuedAtText = formatTimestamp(track.queuedAt || track.suggestedAt);
 
         return `<li class="playlist-item${activeClass}">
           <div class="playlist-main">
@@ -80,6 +97,7 @@ export function createUI(store, actions) {
             <div class="playlist-text">
               <p class="playlist-title">${index + 1}. ${playlistDisplayName(track)}</p>
               <p class="playlist-meta">${meta}</p>
+              <p class="playlist-added">Added to Track Queue at: ${queuedAtText}</p>
             </div>
           </div>
           <div class="playlist-actions">
@@ -95,6 +113,58 @@ export function createUI(store, actions) {
         </li>`;
       })
       .join("");
+  }
+
+  function renderHistoryList(listElement, items) {
+    if (!listElement) {
+      return;
+    }
+
+    if (!items.length) {
+      listElement.innerHTML = "<li class=\"history-empty\">No tracks yet.</li>";
+      return;
+    }
+
+    const recentItems = [...items]
+      .sort((a, b) => {
+        const aTs = Date.parse(a.event_at || 0);
+        const bTs = Date.parse(b.event_at || 0);
+        return bTs - aTs;
+      })
+      .slice(0, 200);
+
+    listElement.innerHTML = recentItems
+      .map((item) => {
+        const timestampText = formatTimestamp(item.event_at);
+        const skippedSeconds = Number.isFinite(item.skipped_after_seconds)
+          ? Math.max(0, Math.round(item.skipped_after_seconds))
+          : null;
+        const metaText = item.kind === "skipped"
+          ? `Skipped after ${skippedSeconds ?? "-"} seconds · ${timestampText}`
+          : `Played at ${timestampText}`;
+        const skippedClass = item.kind === "skipped" ? " history-item-skipped" : "";
+
+        return `<li class="history-item${skippedClass}">
+          <p class="history-title">${item.name || "Unknown track"}${item.artists ? ` · ${item.artists}` : ""}</p>
+          <p class="history-meta">${metaText}</p>
+        </li>`;
+      })
+      .join("");
+  }
+
+  function renderHistory(state) {
+    const played = state.history?.played || [];
+    const skipped = state.history?.skipped || [];
+    const combined = [
+      ...played.map((item) => ({ ...item, kind: "played", event_at: item.played_at })),
+      ...skipped.map((item) => ({ ...item, kind: "skipped", event_at: item.skipped_at })),
+    ];
+
+    if (elements.previousCount) {
+      elements.previousCount.textContent = String(combined.length);
+    }
+
+    renderHistoryList(elements.previousHistoryList, combined);
   }
 
   function renderNowPlaying(state) {
@@ -281,6 +351,7 @@ export function createUI(store, actions) {
 
     renderNowPlaying(state);
     renderPlaylist(state);
+    renderHistory(state);
     renderTimeReadout(state);
     renderDevices(state);
     renderControls(state);
@@ -453,6 +524,23 @@ export function createUI(store, actions) {
       } catch (error) {
         store.setStatus(`Clear failed: ${error.message}`);
       }
+    });
+
+    elements.exportHistoryBtn.addEventListener("click", () => {
+      const payload = actions.exportHistoryJson?.();
+      if (!payload) {
+        return;
+      }
+
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `track-queue-history-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
     });
 
     elements.crossfadeInput.addEventListener("change", () => {

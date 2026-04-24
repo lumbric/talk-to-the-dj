@@ -409,6 +409,13 @@ input {
   font-size: 0.86rem;
 }
 
+.playlist-added {
+  margin: 0.1rem 0 0;
+  color: var(--muted);
+  font-size: 0.73rem;
+  letter-spacing: 0.01em;
+}
+
 .playlist-actions {
   display: flex;
   align-items: center;
@@ -433,6 +440,64 @@ input {
 .playlist-item-active {
   border-color: rgba(255, 47, 146, 0.45);
   background: rgba(255, 47, 146, 0.09);
+}
+
+.history-panel {
+  background: var(--soft);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 0.7rem 0.8rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.history-panel details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.45rem 0.55rem;
+}
+
+.history-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.history-list {
+  margin: 0.45rem 0 0;
+  padding-left: 1rem;
+  max-height: 210px;
+  overflow: auto;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.history-item,
+.history-empty {
+  color: var(--text);
+}
+
+.history-item-skipped {
+  opacity: 0.8;
+}
+
+.history-item-skipped .history-title,
+.history-item-skipped .history-meta {
+  color: #8a7a83;
+}
+
+.history-title,
+.history-meta {
+  margin: 0;
+}
+
+.history-title {
+  font-size: 0.9rem;
+}
+
+.history-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .status {

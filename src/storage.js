@@ -56,6 +56,7 @@ export function loadPersistedAppState() {
       playlist: DEFAULT_STATE.playlist,
       currentTrackIndex: DEFAULT_STATE.currentTrackIndex,
       settings: { ...DEFAULT_SETTINGS },
+      history: { ...DEFAULT_STATE.history },
     };
   }
 
@@ -68,12 +69,19 @@ export function loadPersistedAppState() {
         ...DEFAULT_SETTINGS,
         ...(parsed.settings || {}),
       },
+      history: {
+        queued: Array.isArray(parsed.history?.queued) ? parsed.history.queued : [],
+        playing: Array.isArray(parsed.history?.playing) ? parsed.history.playing : [],
+        played: Array.isArray(parsed.history?.played) ? parsed.history.played : [],
+        skipped: Array.isArray(parsed.history?.skipped) ? parsed.history.skipped : [],
+      },
     };
   } catch {
     return {
       playlist: DEFAULT_STATE.playlist,
       currentTrackIndex: DEFAULT_STATE.currentTrackIndex,
       settings: { ...DEFAULT_SETTINGS },
+      history: { ...DEFAULT_STATE.history },
     };
   }
 }
@@ -83,6 +91,7 @@ export function savePersistedAppState(state) {
     playlist: state.playlist,
     currentTrackIndex: state.currentTrackIndex,
     settings: state.settings,
+    history: state.history,
   };
   localStorage.setItem(APP_STATE_KEY, JSON.stringify(snapshot));
 }

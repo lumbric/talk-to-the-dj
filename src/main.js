@@ -29,6 +29,7 @@ export async function initApp({ spotifyClientId }) {
     togglePlayPause: () => playbackController.togglePlayPause(),
     playNextTrack: () => playbackController.playNextTrack(),
     clearPlaylist: () => playbackController.clearPlaylist(),
+    exportHistoryJson: () => playbackController.exportHistoryJson(),
     setCrossfadeSeconds: (value) => playbackController.setCrossfadeSeconds(value),
     setMode: (mode) => playbackController.setMode(mode),
     selectConnectDevice: (deviceId) => playbackController.selectConnectDevice(deviceId),

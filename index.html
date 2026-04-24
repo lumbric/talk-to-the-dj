@@ -69,6 +69,13 @@
       <ol id="playlist" class="playlist"></ol>
     </section>
 
+    <section class="history-panel" aria-label="History">
+      <details>
+        <summary>Previous Tracks (<span id="previousCount">0</span>)</summary>
+        <ol id="previousHistoryList" class="history-list"></ol>
+      </details>
+    </section>
+
     <p id="status" class="status" aria-live="polite">Not connected.</p>
 
     <div id="errorToast" class="error-toast hidden" role="alert" aria-live="assertive">
@@ -91,6 +98,10 @@
 
       <div class="settings-section">
         <button id="connectBtn" type="button" class="connect">Connect Spotify</button>
+      </div>
+
+      <div class="settings-section">
+        <button id="exportHistoryBtn" type="button" class="connect">Export Track History JSON</button>
       </div>
 
       <div id="devicePanel" class="device-panel hidden settings-section">

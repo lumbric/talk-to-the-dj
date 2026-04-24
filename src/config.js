@@ -22,6 +22,12 @@ export const DEFAULT_STATE = {
   currentTrackIndex: -1,
   settings: DEFAULT_SETTINGS,
   status: "Not connected.",
+  history: {
+    queued: [],
+    playing: [],
+    played: [],
+    skipped: [],
+  },
   playback: {
     sdkDeviceId: "",
     availableDevices: [],

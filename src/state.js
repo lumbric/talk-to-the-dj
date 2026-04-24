@@ -21,12 +21,17 @@ function createInitialState() {
     playlist: persisted.playlist,
     currentTrackIndex: persisted.currentTrackIndex,
     settings: normalizeSettings(persisted.settings),
+    history: {
+      ...DEFAULT_STATE.history,
+      ...(persisted.history || {}),
+    },
   };
 }
 
 export function createStore() {
   let state = createInitialState();
   const listeners = new Set();
+  const MAX_HISTORY_ITEMS = 5000;
 
   function emit() {
     savePersistedAppState(state);
@@ -125,6 +130,21 @@ export function createStore() {
         playback: {
           ...state.playback,
           ...patch,
+        },
+      };
+      emit();
+    },
+    appendHistory(listName, entry) {
+      if (!state.history[listName]) {
+        return;
+      }
+
+      const nextList = [...state.history[listName], entry].slice(-MAX_HISTORY_ITEMS);
+      state = {
+        ...state,
+        history: {
+          ...state.history,
+          [listName]: nextList,
         },
       };
       emit();

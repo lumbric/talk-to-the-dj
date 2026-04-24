@@ -21,9 +21,54 @@ export function createPlaybackController({ store, spotifyApi }) {
     return store.getState();
   }
 
+  function nowIso() {
+    return new Date().toISOString();
+  }
+
+  function spotifyIdFromUri(uri) {
+    if (!uri || typeof uri !== "string") {
+      return "";
+    }
+
+    const parts = uri.split(":");
+    return parts.length >= 3 ? parts[2] : "";
+  }
+
+  function trackSnapshot(track) {
+    return {
+      spotify_id: track.spotifyId || spotifyIdFromUri(track.uri),
+      uri: track.uri,
+      name: track.name,
+      artists: track.artists,
+      duration_ms: track.durationMs,
+      album_name: track.albumName || "",
+      release_date: track.releaseDate || "",
+      popularity: Number.isFinite(track.popularity) ? track.popularity : null,
+      image_url: track.imageUrl || "",
+    };
+  }
+
+  function appendHistory(kind, track, timestamps) {
+    if (!track?.uri) {
+      return;
+    }
+
+    store.appendHistory(kind, {
+      ...trackSnapshot(track),
+      ...timestamps,
+    });
+  }
+
+  function currentPlaybackSeconds() {
+    const ms = Number.isFinite(getState().playback.positionMs) ? getState().playback.positionMs : playbackPositionMs;
+    return Math.max(0, Math.floor((ms || 0) / 1000));
+  }
+
   function toQueuedTrack(track) {
+    const addedAt = nowIso();
     return {
       uri: track.uri,
+      spotifyId: track.id || spotifyIdFromUri(track.uri),
       name: track.name,
       artists: (track.artists || []).map((artist) => artist.name).join(", "),
       durationMs: track.duration_ms,
@@ -31,6 +76,8 @@ export function createPlaybackController({ store, spotifyApi }) {
       releaseDate: track.album?.release_date || "",
       popularity: Number.isFinite(track.popularity) ? track.popularity : null,
       imageUrl: track.album?.images?.[2]?.url || track.album?.images?.[1]?.url || track.album?.images?.[0]?.url || "",
+      suggestedAt: addedAt,
+      queuedAt: addedAt,
     };
   }
 
@@ -143,6 +190,7 @@ export function createPlaybackController({ store, spotifyApi }) {
 
     return {
       uri: track.uri,
+      spotifyId: track.id || spotifyIdFromUri(track.uri),
       name: track.name,
       artists: (track.artists || []).map((artist) => artist.name).join(", "),
       durationMs: track.duration_ms || 0,
@@ -187,16 +235,33 @@ export function createPlaybackController({ store, spotifyApi }) {
     const localState = getState();
     const localCurrentIndex = currentUri ? localState.playlist.findIndex((track) => track.uri === currentUri) : -1;
 
-    if ((syncQueue || forceReplace || localCurrentIndex < 0) && !connectQueueSyncInFlight) {
+    if ((forceReplace || localCurrentIndex < 0) && !connectQueueSyncInFlight) {
       connectQueueSyncInFlight = true;
       try {
         const remoteQueue = await spotifyApi.fetchQueue();
-        const remotePlaylist = buildRemotePlaylist(remoteState.item, remoteQueue);
+        const remotePlaylist = buildRemotePlaylist(remoteState.item, remoteQueue).map((remoteTrack) => {
+          const existing = localState.playlist.find((track) => track.uri === remoteTrack.uri);
+          return {
+            ...remoteTrack,
+            spotifyId: remoteTrack.spotifyId || existing?.spotifyId || spotifyIdFromUri(remoteTrack.uri),
+            suggestedAt: existing?.suggestedAt || null,
+            queuedAt: existing?.queuedAt || nowIso(),
+          };
+        });
         if (remotePlaylist.length) {
+          const localUris = new Set(localState.playlist.map((track) => track.uri));
+          const newlyDiscovered = remotePlaylist.filter((track) => !localUris.has(track.uri));
           const remoteCurrentIndex = currentUri
             ? remotePlaylist.findIndex((track) => track.uri === currentUri)
             : 0;
           store.replacePlaylist(remotePlaylist, remoteCurrentIndex >= 0 ? remoteCurrentIndex : 0);
+
+          newlyDiscovered.forEach((track) => {
+            appendHistory("queued", track, {
+              suggested_at: track.suggestedAt,
+              queued_at: track.queuedAt,
+            });
+          });
         }
       } catch {
         // Queue sync is best effort. Polling will try again.
@@ -209,8 +274,16 @@ export function createPlaybackController({ store, spotifyApi }) {
       const latestState = getState();
       const latestIndex = latestState.playlist.findIndex((track) => track.uri === currentUri);
       if (latestIndex >= 0 && latestIndex !== latestState.currentTrackIndex) {
+        const previousTrack = latestState.currentTrackIndex >= 0
+          ? latestState.playlist[latestState.currentTrackIndex]
+          : null;
+        if (previousTrack?.uri && previousTrack.uri !== currentUri) {
+          appendHistory("played", previousTrack, { played_at: nowIso() });
+        }
+
         store.setCurrentTrackIndex(latestIndex);
         const track = latestState.playlist[latestIndex];
+        appendHistory("playing", track, { playing_at: nowIso() });
         store.setStatus(`Now playing (${latestIndex + 1}/${latestState.playlist.length}): ${playlistDisplayName(track)}`);
       }
     }
@@ -290,6 +363,12 @@ export function createPlaybackController({ store, spotifyApi }) {
       return;
     }
 
+    const previousTrack = state.currentTrackIndex >= 0 ? state.playlist[state.currentTrackIndex] : null;
+    const nextTrack = state.playlist[index];
+    if (previousTrack?.uri && previousTrack.uri !== nextTrack.uri && !options.skipRecordPreviousAsPlayed) {
+      appendHistory("played", previousTrack, { played_at: nowIso() });
+    }
+
     clearTransitionTimers();
     store.setCurrentTrackIndex(index);
 
@@ -298,6 +377,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       await playUrisForMode(index);
       connectPreviousTrackUri = track.uri;
       startConnectPolling();
+      appendHistory("playing", track, { playing_at: nowIso() });
       store.setStatus(`Now playing (${index + 1}/${getState().playlist.length}): ${playlistDisplayName(track)}`);
       return;
     }
@@ -503,6 +583,7 @@ export function createPlaybackController({ store, spotifyApi }) {
         .slice(0, 7)
         .map((track) => ({
           uri: track.uri,
+          spotifyId: track.spotifyId || spotifyIdFromUri(track.uri),
           name: track.name,
           artists: track.artists,
           durationMs: track.durationMs,
@@ -520,6 +601,7 @@ export function createPlaybackController({ store, spotifyApi }) {
         const tracks = await spotifyApi.searchTracks(query.trim(), 7);
         const remoteSuggestions = tracks.map((track) => ({
           uri: track.uri,
+          spotifyId: track.id || spotifyIdFromUri(track.uri),
           name: track.name,
           artists: (track.artists || []).map((artist) => artist.name).join(", "),
           durationMs: track.duration_ms,
@@ -549,6 +631,10 @@ export function createPlaybackController({ store, spotifyApi }) {
       const queuedTrack = toQueuedTrack(track);
 
       store.appendTrack(queuedTrack);
+      appendHistory("queued", queuedTrack, {
+        suggested_at: queuedTrack.suggestedAt,
+        queued_at: queuedTrack.queuedAt,
+      });
       store.setStatus(`Added to Track Queue: ${playlistDisplayName(queuedTrack)}`);
 
       const state = getState();
@@ -569,8 +655,10 @@ export function createPlaybackController({ store, spotifyApi }) {
         return;
       }
 
+      const addedAt = nowIso();
       const queuedTrack = {
         uri: suggestion.uri,
+        spotifyId: suggestion.spotifyId || spotifyIdFromUri(suggestion.uri),
         name: suggestion.name,
         artists: suggestion.artists,
         durationMs: suggestion.durationMs || 0,
@@ -578,9 +666,15 @@ export function createPlaybackController({ store, spotifyApi }) {
         releaseDate: suggestion.releaseDate || "",
         popularity: suggestion.popularity ?? null,
         imageUrl: suggestion.imageUrl || "",
+        suggestedAt: addedAt,
+        queuedAt: addedAt,
       };
 
       store.appendTrack(queuedTrack);
+      appendHistory("queued", queuedTrack, {
+        suggested_at: queuedTrack.suggestedAt,
+        queued_at: queuedTrack.queuedAt,
+      });
       store.setStatus(`Added to Track Queue: ${playlistDisplayName(queuedTrack)}`);
 
       const state = getState();
@@ -609,6 +703,12 @@ export function createPlaybackController({ store, spotifyApi }) {
       const nextState = getState();
 
       if (!nextState.playlist.length) {
+        if (wasCurrentTrack) {
+          appendHistory("skipped", removedTrack, {
+            skipped_at: nowIso(),
+            skipped_after_seconds: currentPlaybackSeconds(),
+          });
+        }
         clearTransitionTimers();
         stopConnectPolling();
         connectPreviousTrackUri = "";
@@ -627,13 +727,16 @@ export function createPlaybackController({ store, spotifyApi }) {
       }
 
       if (wasCurrentTrack) {
+        appendHistory("skipped", removedTrack, {
+          skipped_at: nowIso(),
+          skipped_after_seconds: currentPlaybackSeconds(),
+        });
         const resumeIndex = Math.min(index, nextState.playlist.length - 1);
-        await playTrackAtIndex(resumeIndex);
+        await playTrackAtIndex(resumeIndex, { skipRecordPreviousAsPlayed: true });
       } else if (getPlaybackMode() === "connect" && getActiveDeviceId() && nextState.currentTrackIndex >= 0) {
-        // Spotify Connect does not support removing a queued track directly,
-        // so replaying the local tail keeps device queue and app queue aligned.
-        await playUrisForMode(nextState.currentTrackIndex);
-        store.setStatus(`Updated Track Queue after removing: ${playlistDisplayName(removedTrack)}`);
+        // Do not replay the tail in Connect mode; that would restart the current song.
+        // Spotify has no direct remove-from-queue endpoint, so we keep local queue intact.
+        store.setStatus(`Removed from Track Queue: ${playlistDisplayName(removedTrack)}`);
       } else {
         store.setStatus(`Removed from Track Queue: ${playlistDisplayName(removedTrack)}`);
       }
@@ -657,8 +760,8 @@ export function createPlaybackController({ store, spotifyApi }) {
     },
     async playNextTrack() {
       const state = getState();
-      if (state.currentTrackIndex >= state.playlist.length - 1) {
-        store.setStatus("End of Track Queue.");
+      if (state.currentTrackIndex < 0 || state.currentTrackIndex >= state.playlist.length) {
+        store.setStatus("No track is currently playing.");
         return;
       }
 
@@ -666,17 +769,26 @@ export function createPlaybackController({ store, spotifyApi }) {
         return;
       }
 
-      if (state.settings.playbackMode === "connect") {
-        await playTrackAtIndex(state.currentTrackIndex + 1);
+      const skippedTrack = state.playlist[state.currentTrackIndex];
+      appendHistory("skipped", skippedTrack, {
+        skipped_at: nowIso(),
+        skipped_after_seconds: currentPlaybackSeconds(),
+      });
+
+      store.removeTrack(state.currentTrackIndex);
+      const nextState = getState();
+      if (!nextState.playlist.length) {
+        try {
+          await spotifyApi.pause();
+        } catch {
+          // Ignore pause errors if no active playback is present.
+        }
+        store.setStatus("Track Queue is empty.");
+        resetPlaybackClock();
         return;
       }
 
-      isTransitioning = true;
-      await fadeVolume(currentPlayerVolume, 0, 500);
-      await playTrackAtIndex(state.currentTrackIndex + 1, { startMuted: true, skipAutoCrossfade: true });
-      await fadeVolume(0, DEFAULT_PLAYER_VOLUME, 600);
-      isTransitioning = false;
-      scheduleCrossfadeForTrack(getState().currentTrackIndex);
+      await playTrackAtIndex(nextState.currentTrackIndex, { skipRecordPreviousAsPlayed: true });
     },
     async clearPlaylist() {
       clearTransitionTimers();
@@ -713,6 +825,28 @@ export function createPlaybackController({ store, spotifyApi }) {
         await syncConnectState({ syncQueue: true, forceReplace: true });
         startConnectPolling();
       }
+    },
+    exportHistoryJson() {
+      const state = getState();
+      const payload = {
+        exported_at: nowIso(),
+        queue: state.playlist.map((track, index) => ({
+          position: index + 1,
+          ...trackSnapshot(track),
+          suggested_at: track.suggestedAt || null,
+          queued_at: track.queuedAt || null,
+        })),
+        currently_playing: state.currentTrackIndex >= 0 ? {
+          ...trackSnapshot(state.playlist[state.currentTrackIndex]),
+          playing_at: state.history.playing[state.history.playing.length - 1]?.playing_at || null,
+        } : null,
+        queued: state.history.queued,
+        playing: state.history.playing,
+        played: state.history.played,
+        skipped: state.history.skipped,
+      };
+
+      return JSON.stringify(payload, null, 2);
     },
   };
 }
