@@ -51,19 +51,20 @@ export function createSpotifyApi({ clientId, onToken }) {
   }
 
   async function spotifyFetch(path, options = {}, isRetry = false) {
+    const requestHeaders = {
+      Authorization: `Bearer ${accessToken}`,
+      ...(options.headers || {}),
+    };
+
+    // Only send JSON content-type when a request body exists.
+    if (options.body && !requestHeaders["Content-Type"]) {
+      requestHeaders["Content-Type"] = "application/json";
+    }
+
     const response = await fetch(`https://api.spotify.com/v1${path}`, {
       ...options,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
+      headers: requestHeaders,
     });
-
-    // Any 2xx with no body is a success (204, or empty response from other endpoints)
-    if (response.status === 204 || !response.body) {
-      return null;
-    }
 
     if (response.status === 401 && !isRetry) {
       await refreshAccessToken();
@@ -72,33 +73,40 @@ export function createSpotifyApi({ clientId, onToken }) {
 
     const text = await response.text();
     const trimmed = text.trim();
+    const contentType = response.headers.get("content-type") || "";
+    const isJsonResponse = contentType.includes("application/json");
 
     if (!response.ok) {
       if (!trimmed) {
         throw new Error("Spotify API error");
       }
 
-      try {
-        const parsed = JSON.parse(trimmed);
-        const message = parsed?.error?.message || trimmed;
-        throw new Error(message);
-      } catch {
-        throw new Error(trimmed);
+      if (isJsonResponse) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          const message = parsed?.error?.message || trimmed;
+          throw new Error(message);
+        } catch {
+          throw new Error(trimmed);
+        }
       }
+
+      throw new Error(trimmed);
     }
 
     // Empty response body after success status is OK
-    if (!trimmed) {
+    if (response.status === 204 || !trimmed) {
       return null;
+    }
+
+    if (!isJsonResponse) {
+      return trimmed;
     }
 
     try {
       return JSON.parse(trimmed);
-    } catch (err) {
-      // Log the problematic response for debugging
-      const preview = trimmed.substring(0, 100);
-      console.error("JSON parse failed for Spotify response:", preview, err);
-      throw new Error(`Unexpected response format: ${preview || "(empty)"}`);
+    } catch {
+      throw new Error("Spotify returned an invalid JSON response.");
     }
   }
 
