@@ -21,6 +21,8 @@ Edit `app.js` and set:
 const SPOTIFY_CLIENT_ID = "YOUR_REAL_CLIENT_ID";
 ```
 
+`app.js` is now the module entrypoint and configuration file. The implementation is split across `src/` into a small core, Spotify integration modules, UI rendering, and an isolated LLM integration stub.
+
 ## 3) Run locally
 
 Use any local static server. Example with Python:
@@ -53,3 +55,4 @@ This app implements a practical crossfade transition by:
 
 - Spotify Web Playback SDK requires a **Spotify Premium** account.
 - Browser autoplay restrictions may require a user click (buttons in the UI handle that).
+- Playlist state and playback settings are persisted in local storage. Reopening the page restores the queue and settings, but browser-player playback itself does not continue automatically.

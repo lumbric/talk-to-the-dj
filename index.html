@@ -11,16 +11,19 @@
 </head>
 <body>
   <main class="app">
-    <h1>Spotify DJ</h1>
-    <p class="subtitle">Build a playlist, then let tracks flow in order.</p>
-
-    <div class="mode-toggle" role="group" aria-label="Playback mode">
-      <button id="modeSDKBtn" type="button" class="mode-btn mode-active">Browser Player</button>
-      <button id="modeConnectBtn" type="button" class="mode-btn">Spotify Connect</button>
+    <div class="app-header">
+      <div>
+        <h1>Spotify DJ</h1>
+        <p class="subtitle">Build a playlist, then let tracks flow in order.</p>
+      </div>
+      <button id="settingsBtn" type="button" class="settings-btn" aria-label="Open settings">&#9881;</button>
     </div>
 
     <div class="controls">
-      <input id="songInput" type="text" placeholder="Add a song (title or artist)" />
+      <div class="search-wrap">
+        <input id="songInput" type="text" placeholder="Add a song (title or artist)" autocomplete="off" />
+        <ul id="suggestions" class="suggestions hidden" aria-label="Song suggestions"></ul>
+      </div>
       <button id="addBtn" type="button">Add to Playlist</button>
       <button id="playPauseBtn" type="button" disabled>Play</button>
     </div>
@@ -30,32 +33,58 @@
       <button id="clearBtn" type="button">Clear Playlist</button>
     </div>
 
-    <div id="devicePanel" class="device-panel hidden">
-      <label for="deviceSelect">Target device</label>
-      <div class="device-row">
-        <select id="deviceSelect" class="device-select"><option value="">-- select a device --</option></select>
-        <button id="refreshDevicesBtn" type="button">Refresh</button>
-      </div>
-      <p class="connect-note">Set crossfade in Spotify app settings &rarr; Playback &rarr; Crossfade for native overlap between tracks.</p>
-    </div>
-
-    <div id="crossfadePanel" class="crossfade-panel">
-      <label for="crossfadeInput">Crossfade overlap (seconds)</label>
-      <input id="crossfadeInput" type="number" min="0" max="12" step="1" value="6" />
-    </div>
-
     <p id="timeReadout" class="time-readout" aria-live="polite">Elapsed 0:00 | Remaining -0:00</p>
+    <div class="progress-track" aria-hidden="true">
+      <div id="progressFill" class="progress-fill"></div>
+    </div>
 
     <section class="playlist-panel" aria-label="Playlist queue">
       <h2>Playlist</h2>
       <ol id="playlist" class="playlist"></ol>
     </section>
 
-    <button id="connectBtn" type="button" class="connect">Connect Spotify</button>
     <p id="status" class="status">Not connected.</p>
   </main>
 
+  <dialog id="settingsDialog" class="settings-dialog">
+    <form method="dialog" class="settings-sheet">
+      <div class="settings-header">
+        <div>
+          <h2>Settings</h2>
+          <p>Playback mode, target device, and transition behavior.</p>
+        </div>
+        <button id="closeSettingsBtn" type="submit" class="settings-close" aria-label="Close settings">&times;</button>
+      </div>
+
+      <div class="settings-section">
+        <p class="settings-label">Playback mode</p>
+        <div class="mode-toggle" role="group" aria-label="Playback mode">
+          <button id="modeSDKBtn" type="button" class="mode-btn mode-active">Browser Player</button>
+          <button id="modeConnectBtn" type="button" class="mode-btn">Spotify Connect</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <button id="connectBtn" type="button" class="connect">Connect Spotify</button>
+      </div>
+
+      <div id="devicePanel" class="device-panel hidden settings-section">
+        <label for="deviceSelect">Target device</label>
+        <div class="device-row">
+          <select id="deviceSelect" class="device-select"><option value="">-- select a device --</option></select>
+          <button id="refreshDevicesBtn" type="button">Refresh</button>
+        </div>
+        <p class="connect-note">Set crossfade in Spotify app settings &rarr; Playback &rarr; Crossfade for native overlap between tracks.</p>
+      </div>
+
+      <div id="crossfadePanel" class="crossfade-panel settings-section">
+        <label for="crossfadeInput">Crossfade overlap (seconds)</label>
+        <input id="crossfadeInput" type="number" min="0" max="12" step="1" value="6" />
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
