@@ -48,6 +48,9 @@ export function createStore() {
       return () => listeners.delete(listener);
     },
     setStatus(status) {
+      if (state.status === status) {
+        return;
+      }
       state = { ...state, status };
       emit();
     },
@@ -115,6 +118,20 @@ export function createStore() {
       emit();
     },
     setAvailableDevices(availableDevices) {
+      const current = state.playback.availableDevices || [];
+      const sameLength = current.length === availableDevices.length;
+      const isSame = sameLength && current.every((device, index) => {
+        const next = availableDevices[index];
+        return next
+          && device.id === next.id
+          && device.name === next.name
+          && device.type === next.type
+          && device.is_active === next.is_active;
+      });
+      if (isSame) {
+        return;
+      }
+
       state = {
         ...state,
         playback: {
@@ -125,12 +142,18 @@ export function createStore() {
       emit();
     },
     updatePlayback(patch) {
+      const nextPlayback = {
+        ...state.playback,
+        ...patch,
+      };
+      const unchanged = Object.keys(patch).every((key) => state.playback[key] === nextPlayback[key]);
+      if (unchanged) {
+        return;
+      }
+
       state = {
         ...state,
-        playback: {
-          ...state.playback,
-          ...patch,
-        },
+        playback: nextPlayback,
       };
       emit();
     },

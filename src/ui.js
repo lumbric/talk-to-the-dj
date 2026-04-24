@@ -13,6 +13,12 @@ export function createUI(store, actions) {
   let suggestionsLoading = false;
   let inputHasFocus = false;
   let lastRenderedStatus = "";
+  let lastPlaylistSignature = "";
+  let lastHistorySignature = "";
+  let lastNowPlayingSignature = "";
+  let lastDevicesSignature = "";
+  let lastControlsSignature = "";
+  let lastCrossfadeValue = "";
 
   const elements = {
     settingsBtn: document.getElementById("settingsBtn"),
@@ -343,18 +349,77 @@ export function createUI(store, actions) {
     }, 180);
   }
 
+  function playlistSignature(state) {
+    return `${state.currentTrackIndex}|${state.playlist.map((track) => `${track.uri}:${track.queuedAt || ""}`).join("|")}`;
+  }
+
+  function historySignature(state) {
+    const played = state.history?.played || [];
+    const skipped = state.history?.skipped || [];
+    const playedLast = played.length ? (played[played.length - 1].played_at || "") : "";
+    const skippedLast = skipped.length ? (skipped[skipped.length - 1].skipped_at || "") : "";
+    return `${played.length}:${playedLast}|${skipped.length}:${skippedLast}`;
+  }
+
+  function nowPlayingSignature(state) {
+    const currentTrack = state.currentTrackIndex >= 0 ? state.playlist[state.currentTrackIndex] : null;
+    if (!currentTrack) {
+      return "none";
+    }
+    return `${currentTrack.uri}|${currentTrack.imageUrl || ""}|${currentTrack.albumName || ""}`;
+  }
+
+  function devicesSignature(state) {
+    const devices = state.playback.availableDevices || [];
+    return `${state.settings.connectDeviceId}|${devices.map((d) => `${d.id}:${d.name}:${d.type}`).join("|")}`;
+  }
+
+  function controlsSignature(state) {
+    return `${state.playback.isPaused}|${state.settings.connectDeviceId}|${state.playlist.length}|${state.currentTrackIndex}`;
+  }
+
   function render(state) {
+    const crossfadeValue = String(state.settings.crossfadeSeconds);
+    if (crossfadeValue !== lastCrossfadeValue) {
+      lastCrossfadeValue = crossfadeValue;
+      elements.crossfadeInput.value = crossfadeValue;
+    }
+
     elements.crossfadePanel.classList.add("hidden");
     elements.devicePanel.classList.remove("hidden");
-    elements.crossfadeInput.value = String(state.settings.crossfadeSeconds);
     elements.status.textContent = "";
 
-    renderNowPlaying(state);
-    renderPlaylist(state);
-    renderHistory(state);
+    const currentPlaylistSignature = playlistSignature(state);
+    if (currentPlaylistSignature !== lastPlaylistSignature) {
+      lastPlaylistSignature = currentPlaylistSignature;
+      renderPlaylist(state);
+    }
+
+    const currentHistorySignature = historySignature(state);
+    if (currentHistorySignature !== lastHistorySignature) {
+      lastHistorySignature = currentHistorySignature;
+      renderHistory(state);
+    }
+
+    const currentNowPlayingSignature = nowPlayingSignature(state);
+    if (currentNowPlayingSignature !== lastNowPlayingSignature) {
+      lastNowPlayingSignature = currentNowPlayingSignature;
+      renderNowPlaying(state);
+    }
+
     renderTimeReadout(state);
-    renderDevices(state);
-    renderControls(state);
+
+    const currentDevicesSignature = devicesSignature(state);
+    if (currentDevicesSignature !== lastDevicesSignature) {
+      lastDevicesSignature = currentDevicesSignature;
+      renderDevices(state);
+    }
+
+    const currentControlsSignature = controlsSignature(state);
+    if (currentControlsSignature !== lastControlsSignature) {
+      lastControlsSignature = currentControlsSignature;
+      renderControls(state);
+    }
 
     if (state.status !== lastRenderedStatus) {
       lastRenderedStatus = state.status;

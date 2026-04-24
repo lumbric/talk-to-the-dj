@@ -438,6 +438,10 @@ export function createPlaybackController({ store, spotifyApi }) {
 
       try {
         connectPollTick += 1;
+        const isPaused = getState().playback.isPaused;
+        if (isPaused && connectPollTick % 3 !== 0) {
+          return;
+        }
         await syncConnectState();
       } catch {
         // Ignore transient polling failures.
