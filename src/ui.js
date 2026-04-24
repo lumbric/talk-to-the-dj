@@ -5,6 +5,11 @@ const ICONS = {
   pause: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 5h4v14H7zm6 0h4v14h-4z" /></svg>',
 };
 
+const ADMIN_ICONS = {
+  locked: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="8" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M11.5 12h8M17 12v2M19.5 12v1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>',
+  unlocked: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="8" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M11.5 12h8M17 12v2M19.5 12v1.5M4 20 20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>',
+};
+
 export function createUI(store, actions) {
   let suggestionTimerId;
   let suggestionRequestId = 0;
@@ -20,9 +25,15 @@ export function createUI(store, actions) {
   let lastControlsSignature = "";
   let lastCrossfadeValue = "";
   let lastMaxQueueLengthValue = "";
+  let adminUnlocked = false;
 
   const elements = {
     settingsBtn: document.getElementById("settingsBtn"),
+    adminToggleBtn: document.getElementById("adminToggleBtn"),
+    adminOverlay: document.getElementById("adminOverlay"),
+    adminUnlockForm: document.getElementById("adminUnlockForm"),
+    adminPasswordInput: document.getElementById("adminPasswordInput"),
+    adminUnlockCancelBtn: document.getElementById("adminUnlockCancelBtn"),
     settingsDialog: document.getElementById("settingsDialog"),
     closeSettingsBtn: document.getElementById("closeSettingsBtn"),
     songInput: document.getElementById("songInput"),
@@ -99,6 +110,16 @@ export function createUI(store, actions) {
         const meta = [albumMeta, releaseYear, popularityMeta].filter(Boolean).join(" · ");
         const queuedAtText = formatTimestamp(track.queuedAt || track.suggestedAt);
 
+        const removeButton = adminUnlocked
+          ? `<button
+              type="button"
+              class="queue-remove"
+              data-remove-index="${index}"
+              aria-label="Remove ${playlistDisplayName(track)} from Track Queue"
+              title="Remove from Track Queue"
+            >&times;</button>`
+          : "";
+
         return `<li class="playlist-item${activeClass}">
           <div class="playlist-main">
             ${image}
@@ -110,13 +131,7 @@ export function createUI(store, actions) {
           </div>
           <div class="playlist-actions">
             <span class="playlist-duration">${formatDuration(track.durationMs)}</span>
-            <button
-              type="button"
-              class="queue-remove"
-              data-remove-index="${index}"
-              aria-label="Remove ${playlistDisplayName(track)} from Track Queue"
-              title="Remove from Track Queue"
-            >&times;</button>
+            ${removeButton}
           </div>
         </li>`;
       })
@@ -229,10 +244,15 @@ export function createUI(store, actions) {
     const hasTracks = state.playlist.length > 0;
     const hasNextTrack = state.currentTrackIndex >= 0 && state.currentTrackIndex < state.playlist.length - 1;
     const ready = Boolean(state.settings.connectDeviceId);
+    const locked = !adminUnlocked;
 
-    elements.playPauseBtn.disabled = !ready;
-    elements.nextBtn.disabled = !ready || !hasNextTrack;
-    elements.clearBtn.disabled = !hasTracks;
+    elements.playPauseBtn.classList.toggle("hidden", locked);
+    elements.nextBtn.classList.toggle("hidden", locked);
+    elements.clearBtn.classList.toggle("hidden", locked);
+
+    elements.playPauseBtn.disabled = locked || !ready;
+    elements.nextBtn.disabled = locked || !ready || !hasNextTrack;
+    elements.clearBtn.disabled = locked || !hasTracks;
     elements.playPauseBtn.innerHTML = state.playback.isPaused ? ICONS.play : ICONS.pause;
     elements.playPauseBtn.title = state.playback.isPaused ? "Play" : "Pause";
     elements.playPauseBtn.setAttribute("aria-label", state.playback.isPaused ? "Play" : "Pause");
@@ -352,7 +372,7 @@ export function createUI(store, actions) {
   }
 
   function playlistSignature(state) {
-    return `${state.currentTrackIndex}|${state.playlist.map((track) => `${track.uri}:${track.queuedAt || ""}`).join("|")}`;
+    return `${adminUnlocked}|${state.currentTrackIndex}|${state.playlist.map((track) => `${track.uri}:${track.queuedAt || ""}`).join("|")}`;
   }
 
   function historySignature(state) {
@@ -377,7 +397,42 @@ export function createUI(store, actions) {
   }
 
   function controlsSignature(state) {
-    return `${state.playback.isPaused}|${state.settings.connectDeviceId}|${state.playlist.length}|${state.currentTrackIndex}`;
+    return `${adminUnlocked}|${state.playback.isPaused}|${state.settings.connectDeviceId}|${state.playlist.length}|${state.currentTrackIndex}`;
+  }
+
+  function toggleAdminControls() {
+    if (adminUnlocked) {
+      adminUnlocked = false;
+      store.setStatus("Admin controls locked.");
+      render(store.getState());
+      return;
+    }
+
+    elements.adminOverlay.classList.remove("hidden");
+    elements.adminPasswordInput.value = "";
+    elements.adminPasswordInput.focus();
+  }
+
+  function closeAdminOverlay() {
+    elements.adminOverlay.classList.add("hidden");
+    elements.adminPasswordInput.value = "";
+  }
+
+  function submitAdminUnlock(event) {
+    event.preventDefault();
+    const entered = elements.adminPasswordInput.value;
+
+    if (entered !== "blabla") {
+      store.setStatus("Wrong admin password.");
+      elements.adminPasswordInput.value = "";
+      elements.adminPasswordInput.focus();
+      return;
+    }
+
+    adminUnlocked = true;
+    closeAdminOverlay();
+    store.setStatus("Admin controls unlocked.");
+    render(store.getState());
   }
 
   function render(state) {
@@ -396,6 +451,9 @@ export function createUI(store, actions) {
     elements.crossfadePanel.classList.add("hidden");
     elements.devicePanel.classList.remove("hidden");
     elements.status.textContent = "";
+    elements.adminToggleBtn.innerHTML = adminUnlocked ? ADMIN_ICONS.unlocked : ADMIN_ICONS.locked;
+    elements.adminToggleBtn.setAttribute("aria-label", adminUnlocked ? "Admin controls unlocked" : "Admin controls locked");
+    elements.adminToggleBtn.setAttribute("aria-pressed", String(adminUnlocked));
 
     const currentPlaylistSignature = playlistSignature(state);
     if (currentPlaylistSignature !== lastPlaylistSignature) {
@@ -436,6 +494,14 @@ export function createUI(store, actions) {
   }
 
   function bindEvents() {
+    elements.adminToggleBtn.addEventListener("click", toggleAdminControls);
+    elements.adminUnlockForm.addEventListener("submit", submitAdminUnlock);
+    elements.adminUnlockCancelBtn.addEventListener("click", closeAdminOverlay);
+    elements.adminOverlay.addEventListener("click", (event) => {
+      if (event.target === elements.adminOverlay) {
+        closeAdminOverlay();
+      }
+    });
     elements.settingsBtn.addEventListener("click", openSettingsDialog);
     elements.closeSettingsBtn.addEventListener("click", closeSettingsDialog);
     elements.settingsDialog.addEventListener("click", (event) => {
@@ -561,6 +627,11 @@ export function createUI(store, actions) {
         return;
       }
 
+      if (!adminUnlocked) {
+        store.setStatus("Admin controls are locked.");
+        return;
+      }
+
       const index = Number(button.dataset.removeIndex);
       if (!Number.isInteger(index)) {
         return;
@@ -576,6 +647,11 @@ export function createUI(store, actions) {
     elements.addBtn.addEventListener("click", onAddSong);
 
     elements.playPauseBtn.addEventListener("click", async () => {
+      if (!adminUnlocked) {
+        store.setStatus("Admin controls are locked.");
+        return;
+      }
+
       try {
         await actions.togglePlayPause();
       } catch (error) {
@@ -584,6 +660,11 @@ export function createUI(store, actions) {
     });
 
     elements.nextBtn.addEventListener("click", async () => {
+      if (!adminUnlocked) {
+        store.setStatus("Admin controls are locked.");
+        return;
+      }
+
       try {
         await actions.playNextTrack();
       } catch (error) {
@@ -592,6 +673,11 @@ export function createUI(store, actions) {
     });
 
     elements.clearBtn.addEventListener("click", async () => {
+      if (!adminUnlocked) {
+        store.setStatus("Admin controls are locked.");
+        return;
+      }
+
       try {
         await actions.clearPlaylist();
       } catch (error) {

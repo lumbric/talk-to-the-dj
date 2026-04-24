@@ -54,6 +54,12 @@ body {
   gap: 1rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 h1 {
   margin: 0;
   font-size: clamp(1.8rem, 5vw, 2.6rem);
@@ -118,6 +124,58 @@ input {
   background: #ffdbef;
   font-size: 1.2rem;
   line-height: 1;
+}
+
+#adminToggleBtn {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+}
+
+#adminToggleBtn svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  margin: 0 auto;
+}
+
+.admin-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 18, 18, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+}
+
+.admin-overlay-card {
+  width: min(360px, calc(100vw - 2rem));
+  background: #fff7ed;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 8px 8px 0 #1a1a1a;
+  padding: 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-overlay-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-overlay-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.admin-overlay-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 .player-card,

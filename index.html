@@ -15,7 +15,15 @@
       <div>
         <h1>11 Jahre Werkstatt DJ</h1>
       </div>
-      <button id="settingsBtn" type="button" class="settings-btn" aria-label="Open settings">&#9881;</button>
+      <div class="header-actions">
+        <button id="adminToggleBtn" type="button" class="settings-btn" aria-label="Admin controls locked">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M11.5 12h8M17 12v2M19.5 12v1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button id="settingsBtn" type="button" class="settings-btn" aria-label="Open settings">&#9881;</button>
+      </div>
     </div>
 
     <section class="player-card" aria-label="Player">
@@ -86,6 +94,18 @@
       </div>
     </div>
   </main>
+
+  <div id="adminOverlay" class="admin-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adminOverlayTitle">
+    <form id="adminUnlockForm" class="admin-overlay-card">
+      <h3 id="adminOverlayTitle">Unlock Admin Controls</h3>
+      <p>Enter admin password</p>
+      <input id="adminPasswordInput" type="password" autocomplete="current-password" required />
+      <div class="admin-overlay-actions">
+        <button id="adminUnlockSubmitBtn" type="submit">Unlock</button>
+        <button id="adminUnlockCancelBtn" type="button">Cancel</button>
+      </div>
+    </form>
+  </div>
 
   <dialog id="settingsDialog" class="settings-dialog">
     <form method="dialog" class="settings-sheet">
