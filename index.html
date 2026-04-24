@@ -14,36 +14,59 @@
     <div class="app-header">
       <div>
         <h1>Spotify DJ</h1>
-        <p class="subtitle">Build a playlist, then let tracks flow in order.</p>
+        <p class="subtitle">Queue tracks, then drive playback from the top deck.</p>
       </div>
       <button id="settingsBtn" type="button" class="settings-btn" aria-label="Open settings">&#9881;</button>
     </div>
 
-    <div class="controls">
+    <section class="player-card" aria-label="Player">
+      <div class="now-playing">
+        <div id="nowPlayingArt" class="now-playing-art now-playing-art-fallback" aria-hidden="true"></div>
+        <div class="now-playing-text">
+          <p id="nowPlayingTitle" class="now-playing-title">No track selected</p>
+          <p id="nowPlayingMeta" class="now-playing-meta">Add a song to start your queue.</p>
+        </div>
+      </div>
+
+      <div class="player-progress-row">
+        <span id="elapsedTime" class="player-time">0:00</span>
+        <div class="progress-track" aria-hidden="true">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <span id="remainingTime" class="player-time">-0:00</span>
+      </div>
+
+      <div class="transport">
+        <button id="nextBtn" type="button" class="icon-btn" title="Skip track" aria-label="Skip track" disabled>&#9193;</button>
+        <button id="playPauseBtn" type="button" class="icon-btn icon-btn-primary" title="Play" aria-label="Play" disabled>&#9654;</button>
+      </div>
+    </section>
+
+    <section class="search-panel" aria-label="Add songs">
       <div class="search-wrap">
-        <input id="songInput" type="text" placeholder="Add a song (title or artist)" autocomplete="off" />
+        <input id="songInput" type="text" placeholder="Search songs (title or artist)" autocomplete="off" />
         <ul id="suggestions" class="suggestions hidden" aria-label="Song suggestions"></ul>
       </div>
-      <button id="addBtn" type="button">Add to Playlist</button>
-      <button id="playPauseBtn" type="button" disabled>Play</button>
-    </div>
+      <button id="addBtn" type="button" title="Add to queue" aria-label="Add to queue">+ Queue</button>
+    </section>
 
-    <div class="transport">
-      <button id="nextBtn" type="button" disabled>Next Track</button>
-      <button id="clearBtn" type="button">Clear Playlist</button>
-    </div>
-
-    <p id="timeReadout" class="time-readout" aria-live="polite">Elapsed 0:00 | Remaining -0:00</p>
-    <div class="progress-track" aria-hidden="true">
-      <div id="progressFill" class="progress-fill"></div>
-    </div>
-
-    <section class="playlist-panel" aria-label="Playlist queue">
-      <h2>Playlist</h2>
+    <section class="playlist-panel" aria-label="Queue">
+      <div class="queue-head">
+        <h2>Queue</h2>
+        <button id="clearBtn" type="button" class="clear-btn">Clear Queue</button>
+      </div>
       <ol id="playlist" class="playlist"></ol>
     </section>
 
-    <p id="status" class="status">Not connected.</p>
+    <p id="status" class="status" aria-live="polite">Not connected.</p>
+
+    <div id="errorToast" class="error-toast hidden" role="alert" aria-live="assertive">
+      <p id="errorToastText" class="error-toast-text"></p>
+      <div class="error-toast-actions">
+        <button id="errorToastSettingsBtn" type="button" class="link-btn">Open settings</button>
+        <button id="errorToastDismissBtn" type="button" class="icon-btn" aria-label="Dismiss error">&times;</button>
+      </div>
+    </div>
   </main>
 
   <dialog id="settingsDialog" class="settings-dialog">

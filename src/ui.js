@@ -5,6 +5,7 @@ export function createUI(store, actions) {
   let suggestionRequestId = 0;
   let suggestions = [];
   let highlightedSuggestionIndex = -1;
+  let lastRenderedStatus = "";
 
   const elements = {
     settingsBtn: document.getElementById("settingsBtn"),
@@ -23,11 +24,19 @@ export function createUI(store, actions) {
     modeSDKBtn: document.getElementById("modeSDKBtn"),
     modeConnectBtn: document.getElementById("modeConnectBtn"),
     refreshDevicesBtn: document.getElementById("refreshDevicesBtn"),
-    timeReadout: document.getElementById("timeReadout"),
+    nowPlayingArt: document.getElementById("nowPlayingArt"),
+    nowPlayingTitle: document.getElementById("nowPlayingTitle"),
+    nowPlayingMeta: document.getElementById("nowPlayingMeta"),
+    elapsedTime: document.getElementById("elapsedTime"),
+    remainingTime: document.getElementById("remainingTime"),
     progressFill: document.getElementById("progressFill"),
     playlist: document.getElementById("playlist"),
     connectBtn: document.getElementById("connectBtn"),
     status: document.getElementById("status"),
+    errorToast: document.getElementById("errorToast"),
+    errorToastText: document.getElementById("errorToastText"),
+    errorToastSettingsBtn: document.getElementById("errorToastSettingsBtn"),
+    errorToastDismissBtn: document.getElementById("errorToastDismissBtn"),
   };
 
   function openSettingsDialog() {
@@ -44,7 +53,7 @@ export function createUI(store, actions) {
 
   function renderPlaylist(state) {
     if (!state.playlist.length) {
-      elements.playlist.innerHTML = "<li class=\"playlist-empty\">No songs yet. Search and add one.</li>";
+      elements.playlist.innerHTML = "<li class=\"playlist-empty\">Queue is empty. Search above and add your first track.</li>";
       return;
     }
 
@@ -68,10 +77,41 @@ export function createUI(store, actions) {
               <p class="playlist-meta">${meta}</p>
             </div>
           </div>
-          <span class="playlist-duration">${formatDuration(track.durationMs)}</span>
+          <div class="playlist-actions">
+            <span class="playlist-duration">${formatDuration(track.durationMs)}</span>
+            <button
+              type="button"
+              class="queue-remove"
+              data-remove-index="${index}"
+              aria-label="Remove ${playlistDisplayName(track)} from queue"
+              title="Remove from queue"
+            >&times;</button>
+          </div>
         </li>`;
       })
       .join("");
+  }
+
+  function renderNowPlaying(state) {
+    const currentTrack = state.currentTrackIndex >= 0 ? state.playlist[state.currentTrackIndex] : null;
+    if (!currentTrack) {
+      elements.nowPlayingArt.className = "now-playing-art now-playing-art-fallback";
+      elements.nowPlayingArt.innerHTML = "";
+      elements.nowPlayingTitle.textContent = "No track selected";
+      elements.nowPlayingMeta.textContent = "Add a song to start your queue.";
+      return;
+    }
+
+    if (currentTrack.imageUrl) {
+      elements.nowPlayingArt.className = "now-playing-art";
+      elements.nowPlayingArt.innerHTML = `<img src="${currentTrack.imageUrl}" alt="Cover art" loading="lazy" />`;
+    } else {
+      elements.nowPlayingArt.className = "now-playing-art now-playing-art-fallback";
+      elements.nowPlayingArt.innerHTML = "";
+    }
+
+    elements.nowPlayingTitle.textContent = playlistDisplayName(currentTrack);
+    elements.nowPlayingMeta.textContent = currentTrack.albumName || "Single / Unknown album";
   }
 
   function renderTimeReadout(state) {
@@ -79,7 +119,8 @@ export function createUI(store, actions) {
     const safePosition = Math.min(Math.max(state.playback.positionMs || 0, 0), safeDuration || 0);
     const remainingMs = Math.max(safeDuration - safePosition, 0);
 
-    elements.timeReadout.textContent = `Elapsed ${formatDuration(safePosition)} | Remaining -${formatDuration(remainingMs)}`;
+    elements.elapsedTime.textContent = formatDuration(safePosition);
+    elements.remainingTime.textContent = `-${formatDuration(remainingMs)}`;
 
     const progressPercent = safeDuration > 0 ? (safePosition / safeDuration) * 100 : 0;
     elements.progressFill.style.width = `${progressPercent}%`;
@@ -111,7 +152,25 @@ export function createUI(store, actions) {
     elements.playPauseBtn.disabled = !ready;
     elements.nextBtn.disabled = !ready || !hasNextTrack;
     elements.clearBtn.disabled = !hasTracks;
-    elements.playPauseBtn.textContent = state.playback.isPaused ? "Play" : "Pause";
+    elements.playPauseBtn.innerHTML = state.playback.isPaused ? "&#9654;" : "&#10074;&#10074;";
+    elements.playPauseBtn.title = state.playback.isPaused ? "Play" : "Pause";
+    elements.playPauseBtn.setAttribute("aria-label", state.playback.isPaused ? "Play" : "Pause");
+  }
+
+  function maybeShowErrorToast(status) {
+    const lowered = String(status || "").toLowerCase();
+    const isError = /(error|failed|could not|no active playback device|not connected|authorize|token)/.test(lowered);
+    if (!isError) {
+      elements.errorToast.classList.add("hidden");
+      return;
+    }
+
+    const guidance = /not connected|authorize|token|auth|device/.test(lowered)
+      ? `${status} Open Settings and use Connect Spotify.`
+      : status;
+
+    elements.errorToastText.textContent = guidance;
+    elements.errorToast.classList.remove("hidden");
   }
 
   function renderSuggestions() {
@@ -190,10 +249,16 @@ export function createUI(store, actions) {
     elements.crossfadeInput.value = String(state.settings.crossfadeSeconds);
     elements.status.textContent = state.status;
 
+    renderNowPlaying(state);
     renderPlaylist(state);
     renderTimeReadout(state);
     renderDevices(state);
     renderControls(state);
+
+    if (state.status !== lastRenderedStatus) {
+      lastRenderedStatus = state.status;
+      maybeShowErrorToast(state.status);
+    }
   }
 
   function bindEvents() {
@@ -207,6 +272,14 @@ export function createUI(store, actions) {
 
     elements.connectBtn.addEventListener("click", () => {
       actions.connectSpotify();
+    });
+
+    elements.errorToastSettingsBtn.addEventListener("click", () => {
+      openSettingsDialog();
+    });
+
+    elements.errorToastDismissBtn.addEventListener("click", () => {
+      elements.errorToast.classList.add("hidden");
     });
 
     const onAddSong = async (explicitQuery) => {
@@ -300,6 +373,24 @@ export function createUI(store, actions) {
 
       const index = Number(button.dataset.suggestionIndex);
       onPickSuggestion(index);
+    });
+
+    elements.playlist.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-remove-index]");
+      if (!button) {
+        return;
+      }
+
+      const index = Number(button.dataset.removeIndex);
+      if (!Number.isInteger(index)) {
+        return;
+      }
+
+      try {
+        await actions.removeTrackAt(index);
+      } catch (error) {
+        store.setStatus(`Could not remove track: ${error.message}`);
+      }
     });
 
     elements.addBtn.addEventListener("click", onAddSong);

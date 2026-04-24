@@ -52,6 +52,29 @@ export function createStore() {
       };
       emit();
     },
+    removeTrack(index) {
+      if (index < 0 || index >= state.playlist.length) {
+        return;
+      }
+
+      const nextPlaylist = state.playlist.filter((_, trackIndex) => trackIndex !== index);
+      let nextCurrentTrackIndex = state.currentTrackIndex;
+
+      if (!nextPlaylist.length) {
+        nextCurrentTrackIndex = -1;
+      } else if (index < state.currentTrackIndex) {
+        nextCurrentTrackIndex = state.currentTrackIndex - 1;
+      } else if (index === state.currentTrackIndex) {
+        nextCurrentTrackIndex = Math.min(state.currentTrackIndex, nextPlaylist.length - 1);
+      }
+
+      state = {
+        ...state,
+        playlist: nextPlaylist,
+        currentTrackIndex: nextCurrentTrackIndex,
+      };
+      emit();
+    },
     clearPlaylist() {
       state = {
         ...state,

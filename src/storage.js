@@ -2,6 +2,7 @@ import { DEFAULT_SETTINGS, DEFAULT_STATE } from "./config.js";
 
 const ACCESS_TOKEN_KEY = "spotify_access_token";
 const TOKEN_EXPIRY_KEY = "spotify_token_expiry";
+const REFRESH_TOKEN_KEY = "spotify_refresh_token";
 const PKCE_VERIFIER_KEY = "spotify_pkce_verifier";
 const APP_STATE_KEY = "spotify_dj_app_state";
 
@@ -22,9 +23,18 @@ export function loadStoredToken() {
   return "";
 }
 
+export function saveRefreshToken(token) {
+  localStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+
+export function loadRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY) || "";
+}
+
 export function clearStoredToken() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(TOKEN_EXPIRY_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 export function savePkceVerifier(verifier) {

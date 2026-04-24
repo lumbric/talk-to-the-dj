@@ -2,20 +2,55 @@ import { REDIRECT_URI, SCOPES } from "./config.js";
 import {
   clearPkceVerifier,
   loadPkceVerifier,
+  loadRefreshToken,
   savePkceVerifier,
+  saveRefreshToken,
   saveToken,
 } from "./storage.js";
 import { buildPkceChallenge, randomString } from "./utils.js";
 
 export function createSpotifyApi({ clientId, onToken }) {
   let accessToken = "";
+  let isRefreshing = false;
 
   function setAccessToken(token) {
     accessToken = token;
     onToken?.(token);
   }
 
-  async function spotifyFetch(path, options = {}) {
+  async function refreshAccessToken() {
+    if (isRefreshing) return;
+    const refreshToken = loadRefreshToken();
+    if (!refreshToken) throw new Error("No refresh token stored. Please reconnect.");
+
+    isRefreshing = true;
+    try {
+      const body = new URLSearchParams({
+        client_id: clientId,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      });
+
+      const response = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+
+      if (!response.ok) throw new Error("Token refresh failed. Please reconnect.");
+
+      const data = await response.json();
+      saveToken(data.access_token, data.expires_in);
+      if (data.refresh_token) {
+        saveRefreshToken(data.refresh_token);
+      }
+      setAccessToken(data.access_token);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+
+  async function spotifyFetch(path, options = {}, isRetry = false) {
     const response = await fetch(`https://api.spotify.com/v1${path}`, {
       ...options,
       headers: {
@@ -25,16 +60,46 @@ export function createSpotifyApi({ clientId, onToken }) {
       },
     });
 
-    if (response.status === 204) {
+    // Any 2xx with no body is a success (204, or empty response from other endpoints)
+    if (response.status === 204 || !response.body) {
       return null;
     }
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || "Spotify API error");
+    if (response.status === 401 && !isRetry) {
+      await refreshAccessToken();
+      return spotifyFetch(path, options, true);
     }
 
-    return response.json();
+    const text = await response.text();
+    const trimmed = text.trim();
+
+    if (!response.ok) {
+      if (!trimmed) {
+        throw new Error("Spotify API error");
+      }
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        const message = parsed?.error?.message || trimmed;
+        throw new Error(message);
+      } catch {
+        throw new Error(trimmed);
+      }
+    }
+
+    // Empty response body after success status is OK
+    if (!trimmed) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(trimmed);
+    } catch (err) {
+      // Log the problematic response for debugging
+      const preview = trimmed.substring(0, 100);
+      console.error("JSON parse failed for Spotify response:", preview, err);
+      throw new Error(`Unexpected response format: ${preview || "(empty)"}`);
+    }
   }
 
   return {
@@ -96,6 +161,9 @@ export function createSpotifyApi({ clientId, onToken }) {
 
       const data = await response.json();
       saveToken(data.access_token, data.expires_in);
+      if (data.refresh_token) {
+        saveRefreshToken(data.refresh_token);
+      }
       setAccessToken(data.access_token);
       clearPkceVerifier();
       window.history.replaceState({}, document.title, REDIRECT_URI);
@@ -126,6 +194,10 @@ export function createSpotifyApi({ clientId, onToken }) {
     },
     async fetchPlayerState() {
       return spotifyFetch("/me/player");
+    },
+    async fetchQueue() {
+      const data = await spotifyFetch("/me/player/queue");
+      return data?.queue || [];
     },
     async playUris(deviceId, uris) {
       return spotifyFetch(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
