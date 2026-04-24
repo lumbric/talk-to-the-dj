@@ -1,10 +1,17 @@
 import { formatDuration, playlistDisplayName } from "./utils.js";
 
+const ICONS = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.2 19 12 8 18.8z" /></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 5h4v14H7zm6 0h4v14h-4z" /></svg>',
+};
+
 export function createUI(store, actions) {
   let suggestionTimerId;
   let suggestionRequestId = 0;
   let suggestions = [];
   let highlightedSuggestionIndex = -1;
+  let suggestionsLoading = false;
+  let inputHasFocus = false;
   let lastRenderedStatus = "";
 
   const elements = {
@@ -53,7 +60,7 @@ export function createUI(store, actions) {
 
   function renderPlaylist(state) {
     if (!state.playlist.length) {
-      elements.playlist.innerHTML = "<li class=\"playlist-empty\">Queue is empty. Search above and add your first track.</li>";
+      elements.playlist.innerHTML = "<li class=\"playlist-empty\">Track Queue is empty. Search above and add your first track.</li>";
       return;
     }
 
@@ -83,8 +90,8 @@ export function createUI(store, actions) {
               type="button"
               class="queue-remove"
               data-remove-index="${index}"
-              aria-label="Remove ${playlistDisplayName(track)} from queue"
-              title="Remove from queue"
+              aria-label="Remove ${playlistDisplayName(track)} from Track Queue"
+              title="Remove from Track Queue"
             >&times;</button>
           </div>
         </li>`;
@@ -98,7 +105,7 @@ export function createUI(store, actions) {
       elements.nowPlayingArt.className = "now-playing-art now-playing-art-fallback";
       elements.nowPlayingArt.innerHTML = "";
       elements.nowPlayingTitle.textContent = "No track selected";
-      elements.nowPlayingMeta.textContent = "Add a song to start your queue.";
+      elements.nowPlayingMeta.textContent = "Add a song to start your Track Queue.";
       return;
     }
 
@@ -152,7 +159,7 @@ export function createUI(store, actions) {
     elements.playPauseBtn.disabled = !ready;
     elements.nextBtn.disabled = !ready || !hasNextTrack;
     elements.clearBtn.disabled = !hasTracks;
-    elements.playPauseBtn.innerHTML = state.playback.isPaused ? "&#9654;" : "&#10074;&#10074;";
+    elements.playPauseBtn.innerHTML = state.playback.isPaused ? ICONS.play : ICONS.pause;
     elements.playPauseBtn.title = state.playback.isPaused ? "Play" : "Pause";
     elements.playPauseBtn.setAttribute("aria-label", state.playback.isPaused ? "Play" : "Pause");
   }
@@ -165,18 +172,33 @@ export function createUI(store, actions) {
       return;
     }
 
-    const guidance = /not connected|authorize|token|auth|device/.test(lowered)
+    const shouldShowSettingsAction = /not connected|authorize|token|auth|device|connect spotify/.test(lowered);
+    const guidance = shouldShowSettingsAction
       ? `${status} Open Settings and use Connect Spotify.`
       : status;
 
+    elements.errorToastSettingsBtn.classList.toggle("hidden", !shouldShowSettingsAction);
     elements.errorToastText.textContent = guidance;
     elements.errorToast.classList.remove("hidden");
   }
 
   function renderSuggestions() {
-    if (!suggestions.length) {
+    const query = elements.songInput.value.trim();
+    if (!inputHasFocus || !query) {
       elements.suggestions.innerHTML = "";
       elements.suggestions.classList.add("hidden");
+      return;
+    }
+
+    if (suggestionsLoading) {
+      elements.suggestions.innerHTML = "<li class=\"suggestion-empty\">Searching Track Queue suggestions...</li>";
+      elements.suggestions.classList.remove("hidden");
+      return;
+    }
+
+    if (!suggestions.length) {
+      elements.suggestions.innerHTML = "<li class=\"suggestion-empty\">No suggestions found. Press + to add this search to Track Queue.</li>";
+      elements.suggestions.classList.remove("hidden");
       return;
     }
 
@@ -198,36 +220,50 @@ export function createUI(store, actions) {
         </li>`;
       })
       .join("");
-
-    elements.suggestions.classList.remove("hidden");
   }
 
   function clearSuggestions() {
     suggestions = [];
     highlightedSuggestionIndex = -1;
+    suggestionsLoading = false;
     renderSuggestions();
   }
 
   async function fetchSuggestions(query) {
-    if (!query.trim()) {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
       clearSuggestions();
       return;
     }
 
     const requestId = suggestionRequestId + 1;
     suggestionRequestId = requestId;
+    suggestionsLoading = true;
+    renderSuggestions();
 
     try {
-      const result = await actions.getTrackSuggestions(query.trim());
+      const result = await actions.getTrackSuggestions(normalizedQuery);
       if (requestId !== suggestionRequestId) {
+        return;
+      }
+
+      if (elements.songInput.value.trim() !== normalizedQuery) {
         return;
       }
 
       suggestions = result;
       highlightedSuggestionIndex = -1;
+      suggestionsLoading = false;
       renderSuggestions();
     } catch {
-      clearSuggestions();
+      if (requestId !== suggestionRequestId) {
+        return;
+      }
+
+      suggestions = [];
+      highlightedSuggestionIndex = -1;
+      suggestionsLoading = false;
+      renderSuggestions();
     }
   }
 
@@ -247,7 +283,7 @@ export function createUI(store, actions) {
     elements.crossfadePanel.classList.toggle("hidden", state.settings.playbackMode === "connect");
     elements.devicePanel.classList.toggle("hidden", state.settings.playbackMode === "sdk");
     elements.crossfadeInput.value = String(state.settings.crossfadeSeconds);
-    elements.status.textContent = state.status;
+    elements.status.textContent = "";
 
     renderNowPlaying(state);
     renderPlaylist(state);
@@ -314,19 +350,25 @@ export function createUI(store, actions) {
     };
 
     elements.songInput.addEventListener("input", () => {
+      inputHasFocus = true;
       queueSuggestionFetch(elements.songInput.value);
     });
 
     elements.songInput.addEventListener("blur", () => {
+      inputHasFocus = false;
       setTimeout(() => {
-        clearSuggestions();
+        renderSuggestions();
       }, 120);
     });
 
     elements.songInput.addEventListener("focus", () => {
+      inputHasFocus = true;
       if (elements.songInput.value.trim()) {
         queueSuggestionFetch(elements.songInput.value);
+        return;
       }
+
+      renderSuggestions();
     });
 
     elements.songInput.addEventListener("keydown", (event) => {

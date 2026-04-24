@@ -374,11 +374,11 @@ export function createPlaybackController({ store, spotifyApi }) {
         sdkDeviceId: readyDeviceId,
         isReady: true,
       });
-      store.setStatus("Connected. Add songs to build the playlist.");
+      store.setStatus("Connected. Add songs to build the Track Queue.");
 
       const state = getState();
       if (state.playlist.length && state.currentTrackIndex >= 0) {
-        store.setStatus("Playlist restored. Press Play to resume or pick the next song.");
+        store.setStatus("Track Queue restored. Press Play to resume or pick the next song.");
       }
     });
 
@@ -419,7 +419,7 @@ export function createPlaybackController({ store, spotifyApi }) {
         }
 
         if (remainingMs <= 250 && getState().currentTrackIndex === getState().playlist.length - 1) {
-          store.setStatus("Playlist finished.");
+          store.setStatus("Track Queue finished.");
         }
       }
     });
@@ -548,7 +548,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       const queuedTrack = toQueuedTrack(track);
 
       store.appendTrack(queuedTrack);
-      store.setStatus(`Added to playlist: ${playlistDisplayName(queuedTrack)}`);
+      store.setStatus(`Added to Track Queue: ${playlistDisplayName(queuedTrack)}`);
 
       const state = getState();
       if (state.settings.playbackMode === "connect" && getActiveDeviceId() && state.currentTrackIndex >= 0) {
@@ -580,7 +580,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       };
 
       store.appendTrack(queuedTrack);
-      store.setStatus(`Added to playlist: ${playlistDisplayName(queuedTrack)}`);
+      store.setStatus(`Added to Track Queue: ${playlistDisplayName(queuedTrack)}`);
 
       const state = getState();
       if (state.settings.playbackMode === "connect" && getActiveDeviceId() && state.currentTrackIndex >= 0) {
@@ -621,7 +621,7 @@ export function createPlaybackController({ store, spotifyApi }) {
         } catch {
           // Ignore pause failures while clearing the last item.
         }
-        store.setStatus("Queue is empty.");
+        store.setStatus("Track Queue is empty.");
         return;
       }
 
@@ -632,9 +632,9 @@ export function createPlaybackController({ store, spotifyApi }) {
         // Spotify Connect does not support removing a queued track directly,
         // so replaying the local tail keeps device queue and app queue aligned.
         await playUrisForMode(nextState.currentTrackIndex);
-        store.setStatus(`Updated queue after removing: ${playlistDisplayName(removedTrack)}`);
+        store.setStatus(`Updated Track Queue after removing: ${playlistDisplayName(removedTrack)}`);
       } else {
-        store.setStatus(`Removed from queue: ${playlistDisplayName(removedTrack)}`);
+        store.setStatus(`Removed from Track Queue: ${playlistDisplayName(removedTrack)}`);
       }
     },
     async togglePlayPause() {
@@ -657,7 +657,7 @@ export function createPlaybackController({ store, spotifyApi }) {
     async playNextTrack() {
       const state = getState();
       if (state.currentTrackIndex >= state.playlist.length - 1) {
-        store.setStatus("End of playlist.");
+        store.setStatus("End of Track Queue.");
         return;
       }
 
@@ -689,7 +689,7 @@ export function createPlaybackController({ store, spotifyApi }) {
         } catch {
           // Ignore when no active playback exists on the remote device.
         }
-        store.setStatus("Queue cleared locally. The next added song will replace remote playback.");
+        store.setStatus("Track Queue cleared locally. The next added song will replace remote playback.");
         resetPlaybackClock();
         return;
       }
@@ -703,7 +703,7 @@ export function createPlaybackController({ store, spotifyApi }) {
         }
       }
 
-      store.setStatus("Playlist cleared.");
+      store.setStatus("Track Queue cleared.");
       resetPlaybackClock();
     },
     async hydrateAfterAuth() {

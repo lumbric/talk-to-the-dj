@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Spotify DJ</title>
+  <title>11 Jahre Werkstatt DJ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -13,8 +13,7 @@
   <main class="app">
     <div class="app-header">
       <div>
-        <h1>Spotify DJ</h1>
-        <p class="subtitle">Queue tracks, then drive playback from the top deck.</p>
+        <h1>11 Jahre Werkstatt DJ</h1>
       </div>
       <button id="settingsBtn" type="button" class="settings-btn" aria-label="Open settings">&#9881;</button>
     </div>
@@ -24,7 +23,19 @@
         <div id="nowPlayingArt" class="now-playing-art now-playing-art-fallback" aria-hidden="true"></div>
         <div class="now-playing-text">
           <p id="nowPlayingTitle" class="now-playing-title">No track selected</p>
-          <p id="nowPlayingMeta" class="now-playing-meta">Add a song to start your queue.</p>
+          <p id="nowPlayingMeta" class="now-playing-meta">Add a song to start your Track Queue.</p>
+        </div>
+        <div class="transport">
+          <button id="playPauseBtn" type="button" class="icon-btn icon-btn-primary" title="Play" aria-label="Play" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M8 5.2 19 12 8 18.8z" />
+            </svg>
+          </button>
+          <button id="nextBtn" type="button" class="icon-btn" title="Skip track" aria-label="Skip track" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M6 6.5v11l9-5.5zM18 6h2v12h-2z" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -36,10 +47,6 @@
         <span id="remainingTime" class="player-time">-0:00</span>
       </div>
 
-      <div class="transport">
-        <button id="nextBtn" type="button" class="icon-btn" title="Skip track" aria-label="Skip track" disabled>&#9193;</button>
-        <button id="playPauseBtn" type="button" class="icon-btn icon-btn-primary" title="Play" aria-label="Play" disabled>&#9654;</button>
-      </div>
     </section>
 
     <section class="search-panel" aria-label="Add songs">
@@ -47,13 +54,17 @@
         <input id="songInput" type="text" placeholder="Search songs (title or artist)" autocomplete="off" />
         <ul id="suggestions" class="suggestions hidden" aria-label="Song suggestions"></ul>
       </div>
-      <button id="addBtn" type="button" title="Add to queue" aria-label="Add to queue">+ Queue</button>
+      <button id="addBtn" type="button" class="add-btn" title="Add to Track Queue" aria-label="Add to Track Queue">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z" />
+        </svg>
+      </button>
     </section>
 
-    <section class="playlist-panel" aria-label="Queue">
+    <section class="playlist-panel" aria-label="Track Queue">
       <div class="queue-head">
-        <h2>Queue</h2>
-        <button id="clearBtn" type="button" class="clear-btn">Clear Queue</button>
+        <h2>Track Queue</h2>
+        <button id="clearBtn" type="button" class="clear-btn">Clear Track Queue</button>
       </div>
       <ol id="playlist" class="playlist"></ol>
     </section>
@@ -63,7 +74,7 @@
     <div id="errorToast" class="error-toast hidden" role="alert" aria-live="assertive">
       <p id="errorToastText" class="error-toast-text"></p>
       <div class="error-toast-actions">
-        <button id="errorToastSettingsBtn" type="button" class="link-btn">Open settings</button>
+        <button id="errorToastSettingsBtn" type="button" class="link-btn hidden">Open settings</button>
         <button id="errorToastDismissBtn" type="button" class="icon-btn" aria-label="Dismiss error">&times;</button>
       </div>
     </div>

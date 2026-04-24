@@ -1,7 +1,7 @@
-# Spotify DJ (One-Page App)
+# 11 Jahre Werkstatt DJ (One-Page App)
 
 Simple one-page HTML + JavaScript app that uses the Spotify API to:
-- Search songs and append them to a playlist
+- Search songs and append them to the Track Queue
 - Play songs in order
 - Toggle play/pause and skip tracks
 - Apply configurable crossfade-style transitions between songs
@@ -35,11 +35,11 @@ python3 -m http.server 5500 --bind 127.0.0.1
 Open:
 - `http://127.0.0.1:5500/`
 
-## How Playlist + Crossfade Work
+## How Track Queue + Crossfade Work
 
-- Use the search field and click **Add to Playlist** to append tracks.
+- Use the search field and click **+** to append tracks to the Track Queue.
 - The first added track starts playback automatically (once connected).
-- Tracks continue in playlist order.
+- Tracks continue in Track Queue order.
 - Set overlap seconds in the crossfade input (0-12, default 6).
 
 ### Crossfade note
@@ -55,4 +55,4 @@ This app implements a practical crossfade transition by:
 
 - Spotify Web Playback SDK requires a **Spotify Premium** account.
 - Browser autoplay restrictions may require a user click (buttons in the UI handle that).
-- Playlist state and playback settings are persisted in local storage. Reopening the page restores the queue and settings, but browser-player playback itself does not continue automatically.
+- Track Queue state and playback settings are persisted in local storage. Reopening the page restores the queue and settings, but browser-player playback itself does not continue automatically.
