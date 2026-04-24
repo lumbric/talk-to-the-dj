@@ -15,7 +15,6 @@ export function createPlaybackController({ store, spotifyApi }) {
   let playbackPaused = true;
   let playbackLastSyncTs = 0;
   let connectPollTick = 0;
-  let connectQueueSyncInFlight = false;
   let suppressRemoteQueueReplaceUntil = 0;
 
   function getState() {
@@ -188,39 +187,7 @@ export function createPlaybackController({ store, spotifyApi }) {
     store.updateSettings({ connectDeviceId: active.id });
   }
 
-  function toQueuedTrackFromPlaybackItem(track) {
-    if (!track?.uri) {
-      return null;
-    }
-
-    return {
-      uri: track.uri,
-      spotifyId: track.id || spotifyIdFromUri(track.uri),
-      name: track.name,
-      artists: (track.artists || []).map((artist) => artist.name).join(", "),
-      durationMs: track.duration_ms || 0,
-      albumName: track.album?.name || "",
-      releaseDate: track.album?.release_date || "",
-      popularity: Number.isFinite(track.popularity) ? track.popularity : null,
-      imageUrl: track.album?.images?.[2]?.url || track.album?.images?.[1]?.url || track.album?.images?.[0]?.url || "",
-    };
-  }
-
-  function buildRemotePlaylist(currentTrack, queuedTracks = []) {
-    const seenUris = new Set();
-    return [currentTrack, ...queuedTracks]
-      .map(toQueuedTrackFromPlaybackItem)
-      .filter(Boolean)
-      .filter((track) => {
-        if (seenUris.has(track.uri)) {
-          return false;
-        }
-        seenUris.add(track.uri);
-        return true;
-      });
-  }
-
-  async function syncConnectState({ syncQueue = false, forceReplace = false } = {}) {
+  async function syncConnectState() {
     if (!spotifyApi.getAccessToken()) {
       return;
     }
@@ -237,49 +204,15 @@ export function createPlaybackController({ store, spotifyApi }) {
       connectPreviousTrackUri = currentUri;
     }
 
-    const localState = getState();
-    const localCurrentIndex = currentUri ? localState.playlist.findIndex((track) => track.uri === currentUri) : -1;
-    const isSuppressed = Date.now() < suppressRemoteQueueReplaceUntil;
-    const shouldReplaceFromRemote = forceReplace || (Boolean(currentUri) && localCurrentIndex < 0 && !isSuppressed);
-
-    if (shouldReplaceFromRemote && !connectQueueSyncInFlight) {
-      connectQueueSyncInFlight = true;
-      try {
-        const remoteQueue = await spotifyApi.fetchQueue();
-        const remotePlaylist = buildRemotePlaylist(remoteState.item, remoteQueue).map((remoteTrack) => {
-          const existing = localState.playlist.find((track) => track.uri === remoteTrack.uri);
-          return {
-            ...remoteTrack,
-            spotifyId: remoteTrack.spotifyId || existing?.spotifyId || spotifyIdFromUri(remoteTrack.uri),
-            suggestedAt: existing?.suggestedAt || null,
-            queuedAt: existing?.queuedAt || nowIso(),
-          };
-        });
-        if (remotePlaylist.length) {
-          const localUris = new Set(localState.playlist.map((track) => track.uri));
-          const newlyDiscovered = remotePlaylist.filter((track) => !localUris.has(track.uri));
-          const remoteCurrentIndex = currentUri
-            ? remotePlaylist.findIndex((track) => track.uri === currentUri)
-            : 0;
-          store.replacePlaylist(remotePlaylist, remoteCurrentIndex >= 0 ? remoteCurrentIndex : 0);
-
-          newlyDiscovered.forEach((track) => {
-            appendHistory("queued", track, {
-              suggested_at: track.suggestedAt,
-              queued_at: track.queuedAt,
-            });
-          });
-        }
-      } catch {
-        // Queue sync is best effort. Polling will try again.
-      } finally {
-        connectQueueSyncInFlight = false;
-      }
-    }
-
     if (currentUri) {
       const latestState = getState();
       const latestIndex = latestState.playlist.findIndex((track) => track.uri === currentUri);
+
+      // Local queue is out of sync with the device: do not fetch/replace from remote.
+      if (latestIndex < 0) {
+        return;
+      }
+
       if (latestIndex >= 0 && latestIndex !== latestState.currentTrackIndex) {
         const previousTrack = latestState.currentTrackIndex >= 0
           ? latestState.playlist[latestState.currentTrackIndex]
@@ -288,12 +221,70 @@ export function createPlaybackController({ store, spotifyApi }) {
           appendHistory("played", previousTrack, { played_at: nowIso() });
         }
 
-        store.setCurrentTrackIndex(latestIndex);
         const track = latestState.playlist[latestIndex];
+
+        // Drop already-played tracks from the local queue so current is always index 0.
+        if (latestIndex > 0) {
+          store.replacePlaylist(latestState.playlist.slice(latestIndex), 0);
+        } else {
+          store.setCurrentTrackIndex(0);
+        }
+
         appendHistory("playing", track, { playing_at: nowIso() });
-        store.setStatus(`Now playing (${latestIndex + 1}/${latestState.playlist.length}): ${playlistDisplayName(track)}`);
+        const trimmedState = getState();
+        store.setStatus(`Now playing (1/${trimmedState.playlist.length}): ${playlistDisplayName(track)}`);
+
+        enqueueImmediateNextForCurrent().catch(() => {
+          // Best effort: local queue remains authoritative.
+        });
       }
     }
+  }
+
+  async function enqueueImmediateNextIfNeededAfterAppend(addedTrackUri) {
+    if (getPlaybackMode() !== "connect") {
+      return;
+    }
+
+    const deviceId = getConnectDeviceId();
+    if (!deviceId) {
+      return;
+    }
+
+    const state = getState();
+    if (state.currentTrackIndex < 0 || state.currentTrackIndex >= state.playlist.length) {
+      return;
+    }
+
+    const nextTrack = state.playlist[state.currentTrackIndex + 1] || null;
+    if (!nextTrack?.uri || nextTrack.uri !== addedTrackUri) {
+      return;
+    }
+
+    await spotifyApi.enqueue(deviceId, nextTrack.uri);
+  }
+
+  async function enqueueImmediateNextForCurrent() {
+    if (getPlaybackMode() !== "connect") {
+      return;
+    }
+
+    const deviceId = getConnectDeviceId();
+    if (!deviceId) {
+      return;
+    }
+
+    const state = getState();
+    if (state.currentTrackIndex < 0 || state.currentTrackIndex >= state.playlist.length) {
+      return;
+    }
+
+    const nextTrack = state.playlist[state.currentTrackIndex + 1] || null;
+    if (!nextTrack?.uri) {
+      return;
+    }
+
+    await spotifyApi.enqueue(deviceId, nextTrack.uri);
   }
 
   async function playUrisForMode(index) {
@@ -436,7 +427,7 @@ export function createPlaybackController({ store, spotifyApi }) {
     }
 
     connectPollTick = 0;
-    syncConnectState({ syncQueue: true }).catch(() => {
+    syncConnectState().catch(() => {
       // Ignore initial sync failures; interval will retry.
     });
 
@@ -447,8 +438,7 @@ export function createPlaybackController({ store, spotifyApi }) {
 
       try {
         connectPollTick += 1;
-        const shouldSyncQueue = connectPollTick % 4 === 0;
-        await syncConnectState({ syncQueue: shouldSyncQueue });
+        await syncConnectState();
       } catch {
         // Ignore transient polling failures.
       }
@@ -561,7 +551,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       connectPreviousTrackUri = "";
       if (spotifyApi.getAccessToken()) {
         await loadDevices();
-        await syncConnectState({ syncQueue: true, forceReplace: true });
+        await syncConnectState();
         startConnectPolling();
       }
     },
@@ -648,7 +638,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       const state = getState();
       if (state.settings.playbackMode === "connect" && getActiveDeviceId() && state.currentTrackIndex >= 0) {
         try {
-          await spotifyApi.enqueue(getConnectDeviceId(), queuedTrack.uri);
+          await enqueueImmediateNextIfNeededAfterAppend(queuedTrack.uri);
         } catch {
           // Keep the track in the persisted playlist even if queue append fails.
         }
@@ -689,7 +679,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       const state = getState();
       if (state.settings.playbackMode === "connect" && getActiveDeviceId() && state.currentTrackIndex >= 0) {
         try {
-          await spotifyApi.enqueue(getConnectDeviceId(), queuedTrack.uri);
+          await enqueueImmediateNextIfNeededAfterAppend(queuedTrack.uri);
         } catch {
           // Keep the track in the persisted playlist even if queue append fails.
         }
@@ -753,11 +743,48 @@ export function createPlaybackController({ store, spotifyApi }) {
     },
     async togglePlayPause() {
       if (getPlaybackMode() === "connect") {
-        const state = await spotifyApi.fetchPlayerState();
-        if (state?.is_playing) {
-          await spotifyApi.pause();
-        } else {
-          await spotifyApi.resume(getConnectDeviceId());
+        const shouldPause = !getState().playback.isPaused;
+        const deviceId = getConnectDeviceId();
+
+        const isTransientGatewayError = (error) => {
+          const message = String(error?.message || "").toLowerCase();
+          return message.includes("502") || message.includes("bad gateway");
+        };
+
+        const wait = (ms) => new Promise((resolve) => {
+          setTimeout(resolve, ms);
+        });
+
+        const runToggleOnce = async () => {
+          if (shouldPause) {
+            await spotifyApi.pause();
+            return;
+          }
+
+          // Prefer device-targeted resume, but fallback to generic resume endpoint.
+          if (deviceId) {
+            try {
+              await spotifyApi.resume(deviceId);
+              return;
+            } catch (error) {
+              if (!isTransientGatewayError(error)) {
+                throw error;
+              }
+            }
+          }
+
+          await spotifyApi.resume();
+        };
+
+        try {
+          await runToggleOnce();
+        } catch (error) {
+          if (!isTransientGatewayError(error)) {
+            throw error;
+          }
+
+          await wait(350);
+          await runToggleOnce();
         }
         return;
       }
@@ -834,7 +861,7 @@ export function createPlaybackController({ store, spotifyApi }) {
     async hydrateAfterAuth() {
       if (getPlaybackMode() === "connect") {
         await loadDevices();
-        await syncConnectState({ syncQueue: true, forceReplace: true });
+        await syncConnectState();
         startConnectPolling();
       }
     },

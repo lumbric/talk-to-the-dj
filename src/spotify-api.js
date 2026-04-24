@@ -216,8 +216,11 @@ export function createSpotifyApi({ clientId, onToken }) {
     async pause() {
       return spotifyFetch("/me/player/pause", { method: "PUT" });
     },
-    async resume(deviceId) {
-      return spotifyFetch(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
+    async resume(deviceId = "") {
+      const path = deviceId
+        ? `/me/player/play?device_id=${encodeURIComponent(deviceId)}`
+        : "/me/player/play";
+      return spotifyFetch(path, {
         method: "PUT",
       });
     },
