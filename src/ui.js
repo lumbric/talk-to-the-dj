@@ -28,8 +28,6 @@ export function createUI(store, actions) {
     crossfadePanel: document.getElementById("crossfadePanel"),
     devicePanel: document.getElementById("devicePanel"),
     deviceSelect: document.getElementById("deviceSelect"),
-    modeSDKBtn: document.getElementById("modeSDKBtn"),
-    modeConnectBtn: document.getElementById("modeConnectBtn"),
     refreshDevicesBtn: document.getElementById("refreshDevicesBtn"),
     nowPlayingArt: document.getElementById("nowPlayingArt"),
     nowPlayingTitle: document.getElementById("nowPlayingTitle"),
@@ -152,9 +150,7 @@ export function createUI(store, actions) {
   function renderControls(state) {
     const hasTracks = state.playlist.length > 0;
     const hasNextTrack = state.currentTrackIndex >= 0 && state.currentTrackIndex < state.playlist.length - 1;
-    const ready = state.settings.playbackMode === "connect"
-      ? Boolean(state.settings.connectDeviceId)
-      : Boolean(state.playback.sdkDeviceId);
+    const ready = Boolean(state.settings.connectDeviceId);
 
     elements.playPauseBtn.disabled = !ready;
     elements.nextBtn.disabled = !ready || !hasNextTrack;
@@ -278,10 +274,8 @@ export function createUI(store, actions) {
   }
 
   function render(state) {
-    elements.modeSDKBtn.classList.toggle("mode-active", state.settings.playbackMode === "sdk");
-    elements.modeConnectBtn.classList.toggle("mode-active", state.settings.playbackMode === "connect");
-    elements.crossfadePanel.classList.toggle("hidden", state.settings.playbackMode === "connect");
-    elements.devicePanel.classList.toggle("hidden", state.settings.playbackMode === "sdk");
+    elements.crossfadePanel.classList.add("hidden");
+    elements.devicePanel.classList.remove("hidden");
     elements.crossfadeInput.value = String(state.settings.crossfadeSeconds);
     elements.status.textContent = "";
 
@@ -463,14 +457,6 @@ export function createUI(store, actions) {
 
     elements.crossfadeInput.addEventListener("change", () => {
       actions.setCrossfadeSeconds(elements.crossfadeInput.value);
-    });
-
-    elements.modeSDKBtn.addEventListener("click", () => {
-      actions.setMode("sdk");
-    });
-
-    elements.modeConnectBtn.addEventListener("click", () => {
-      actions.setMode("connect");
     });
 
     elements.deviceSelect.addEventListener("change", () => {

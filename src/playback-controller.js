@@ -468,10 +468,11 @@ export function createPlaybackController({ store, spotifyApi }) {
       await loadDevices();
     },
     async setMode(mode) {
-      store.updateSettings({ playbackMode: mode });
+      const nextMode = mode === "connect" ? "connect" : "connect";
+      store.updateSettings({ playbackMode: nextMode });
       stopConnectPolling();
       connectPreviousTrackUri = "";
-      if (mode === "connect" && spotifyApi.getAccessToken()) {
+      if (spotifyApi.getAccessToken()) {
         await loadDevices();
         await syncConnectState({ syncQueue: true, forceReplace: true });
         startConnectPolling();

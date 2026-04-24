@@ -14,10 +14,6 @@ export async function initApp({ spotifyClientId }) {
   const playbackController = createPlaybackController({ store, spotifyApi });
   createDjAgent();
 
-  // Register the SDK callback immediately — the SDK script may fire it before
-  // the async auth flow completes, so it must exist on window up front.
-  playbackController.registerSdkCallback();
-
   const actions = {
     connectSpotify: async () => {
       try {
@@ -54,8 +50,7 @@ export async function initApp({ spotifyClientId }) {
     }
 
     if (fromCallback || storedToken) {
-      store.setStatus("Authorizing player...");
-      playbackController.setupPlayer();
+      store.setStatus("Authorizing Spotify...");
       await playbackController.hydrateAfterAuth();
     } else {
       store.setStatus("Click Connect Spotify to authorize.");

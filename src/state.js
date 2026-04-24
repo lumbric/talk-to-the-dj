@@ -9,6 +9,7 @@ function normalizeSettings(settings) {
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
+    playbackMode: "connect",
     crossfadeSeconds: clamp(Number(settings?.crossfadeSeconds ?? DEFAULT_SETTINGS.crossfadeSeconds), 0, MAX_CROSSFADE_SECONDS),
   };
 }

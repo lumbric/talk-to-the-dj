@@ -12,7 +12,7 @@ export const DEFAULT_PLAYER_VOLUME = 0.8;
 export const MAX_CROSSFADE_SECONDS = 12;
 
 export const DEFAULT_SETTINGS = {
-  playbackMode: "sdk",
+  playbackMode: "connect",
   connectDeviceId: "",
   crossfadeSeconds: 6,
 };
