@@ -19,6 +19,7 @@ export function createUI(store, actions) {
   let lastDevicesSignature = "";
   let lastControlsSignature = "";
   let lastCrossfadeValue = "";
+  let lastMaxQueueLengthValue = "";
 
   const elements = {
     settingsBtn: document.getElementById("settingsBtn"),
@@ -32,6 +33,7 @@ export function createUI(store, actions) {
     clearBtn: document.getElementById("clearBtn"),
     exportHistoryBtn: document.getElementById("exportHistoryBtn"),
     crossfadeInput: document.getElementById("crossfadeInput"),
+    maxQueueLengthInput: document.getElementById("maxQueueLengthInput"),
     crossfadePanel: document.getElementById("crossfadePanel"),
     devicePanel: document.getElementById("devicePanel"),
     deviceSelect: document.getElementById("deviceSelect"),
@@ -385,6 +387,12 @@ export function createUI(store, actions) {
       elements.crossfadeInput.value = crossfadeValue;
     }
 
+    const maxQueueLengthValue = String(state.settings.maxQueueLength);
+    if (maxQueueLengthValue !== lastMaxQueueLengthValue) {
+      lastMaxQueueLengthValue = maxQueueLengthValue;
+      elements.maxQueueLengthInput.value = maxQueueLengthValue;
+    }
+
     elements.crossfadePanel.classList.add("hidden");
     elements.devicePanel.classList.remove("hidden");
     elements.status.textContent = "";
@@ -610,6 +618,10 @@ export function createUI(store, actions) {
 
     elements.crossfadeInput.addEventListener("change", () => {
       actions.setCrossfadeSeconds(elements.crossfadeInput.value);
+    });
+
+    elements.maxQueueLengthInput.addEventListener("change", () => {
+      actions.setMaxQueueLength(elements.maxQueueLengthInput.value);
     });
 
     elements.deviceSelect.addEventListener("change", () => {

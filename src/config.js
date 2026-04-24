@@ -10,11 +10,14 @@ export const SCOPES = [
 
 export const DEFAULT_PLAYER_VOLUME = 0.8;
 export const MAX_CROSSFADE_SECONDS = 12;
+export const MIN_QUEUE_LENGTH = 1;
+export const MAX_QUEUE_LENGTH = 500;
 
 export const DEFAULT_SETTINGS = {
   playbackMode: "connect",
   connectDeviceId: "",
   crossfadeSeconds: 6,
+  maxQueueLength: 50,
 };
 
 export const DEFAULT_STATE = {

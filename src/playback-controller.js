@@ -68,6 +68,16 @@ export function createPlaybackController({ store, spotifyApi }) {
     return Math.max(0, Math.floor((ms || 0) / 1000));
   }
 
+  function hasQueueCapacity() {
+    const state = getState();
+    return state.playlist.length < state.settings.maxQueueLength;
+  }
+
+  function setQueueFullStatus() {
+    const state = getState();
+    store.setStatus(`Track Queue is full (${state.playlist.length}/${state.settings.maxQueueLength} songs).`);
+  }
+
   function toQueuedTrack(track) {
     const addedAt = nowIso();
     return {
@@ -570,6 +580,14 @@ export function createPlaybackController({ store, spotifyApi }) {
         scheduleCrossfadeForTrack(currentIndex);
       }
     },
+    setMaxQueueLength(length) {
+      store.updateSettings({ maxQueueLength: length });
+
+      const state = getState();
+      if (state.playlist.length >= state.settings.maxQueueLength) {
+        setQueueFullStatus();
+      }
+    },
     async getTrackSuggestions(query) {
       if (!query || !query.trim()) {
         return [];
@@ -622,6 +640,11 @@ export function createPlaybackController({ store, spotifyApi }) {
       }
     },
     async addTrackByQuery(query) {
+      if (!hasQueueCapacity()) {
+        setQueueFullStatus();
+        return;
+      }
+
       store.setStatus("Searching for track...");
       const track = await spotifyApi.searchFirstTrack(query);
       if (!track) {
@@ -654,6 +677,11 @@ export function createPlaybackController({ store, spotifyApi }) {
     },
     async addTrackFromSuggestion(suggestion) {
       if (!suggestion?.uri) {
+        return;
+      }
+
+      if (!hasQueueCapacity()) {
+        setQueueFullStatus();
         return;
       }
 

@@ -31,6 +31,7 @@ export async function initApp({ spotifyClientId }) {
     clearPlaylist: () => playbackController.clearPlaylist(),
     exportHistoryJson: () => playbackController.exportHistoryJson(),
     setCrossfadeSeconds: (value) => playbackController.setCrossfadeSeconds(value),
+    setMaxQueueLength: (value) => playbackController.setMaxQueueLength(value),
     setMode: (mode) => playbackController.setMode(mode),
     selectConnectDevice: (deviceId) => playbackController.selectConnectDevice(deviceId),
     refreshDevices: () => playbackController.refreshDevices(),

@@ -1,4 +1,10 @@
-import { DEFAULT_STATE, DEFAULT_SETTINGS, MAX_CROSSFADE_SECONDS } from "./config.js";
+import {
+  DEFAULT_STATE,
+  DEFAULT_SETTINGS,
+  MAX_CROSSFADE_SECONDS,
+  MAX_QUEUE_LENGTH,
+  MIN_QUEUE_LENGTH,
+} from "./config.js";
 import { loadPersistedAppState, savePersistedAppState } from "./storage.js";
 
 function clamp(value, min, max) {
@@ -11,6 +17,11 @@ function normalizeSettings(settings) {
     ...settings,
     playbackMode: "connect",
     crossfadeSeconds: clamp(Number(settings?.crossfadeSeconds ?? DEFAULT_SETTINGS.crossfadeSeconds), 0, MAX_CROSSFADE_SECONDS),
+    maxQueueLength: clamp(
+      Number(settings?.maxQueueLength ?? DEFAULT_SETTINGS.maxQueueLength),
+      MIN_QUEUE_LENGTH,
+      MAX_QUEUE_LENGTH,
+    ),
   };
 }
 
