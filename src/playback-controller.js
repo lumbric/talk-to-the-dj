@@ -16,9 +16,14 @@ export function createPlaybackController({ store, spotifyApi }) {
   let playbackLastSyncTs = 0;
   let connectPollTick = 0;
   let connectQueueSyncInFlight = false;
+  let suppressRemoteQueueReplaceUntil = 0;
 
   function getState() {
     return store.getState();
+  }
+
+  function suppressRemoteQueueReplace(ms = 15000) {
+    suppressRemoteQueueReplaceUntil = Date.now() + ms;
   }
 
   function nowIso() {
@@ -234,8 +239,10 @@ export function createPlaybackController({ store, spotifyApi }) {
 
     const localState = getState();
     const localCurrentIndex = currentUri ? localState.playlist.findIndex((track) => track.uri === currentUri) : -1;
+    const isSuppressed = Date.now() < suppressRemoteQueueReplaceUntil;
+    const shouldReplaceFromRemote = forceReplace || (Boolean(currentUri) && localCurrentIndex < 0 && !isSuppressed);
 
-    if ((forceReplace || localCurrentIndex < 0) && !connectQueueSyncInFlight) {
+    if (shouldReplaceFromRemote && !connectQueueSyncInFlight) {
       connectQueueSyncInFlight = true;
       try {
         const remoteQueue = await spotifyApi.fetchQueue();
@@ -631,6 +638,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       const queuedTrack = toQueuedTrack(track);
 
       store.appendTrack(queuedTrack);
+      suppressRemoteQueueReplace();
       appendHistory("queued", queuedTrack, {
         suggested_at: queuedTrack.suggestedAt,
         queued_at: queuedTrack.queuedAt,
@@ -671,6 +679,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       };
 
       store.appendTrack(queuedTrack);
+      suppressRemoteQueueReplace();
       appendHistory("queued", queuedTrack, {
         suggested_at: queuedTrack.suggestedAt,
         queued_at: queuedTrack.queuedAt,
@@ -699,6 +708,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       const removedTrack = state.playlist[index];
       const wasCurrentTrack = index === state.currentTrackIndex;
 
+      suppressRemoteQueueReplace();
       store.removeTrack(index);
       const nextState = getState();
 
@@ -775,6 +785,7 @@ export function createPlaybackController({ store, spotifyApi }) {
         skipped_after_seconds: currentPlaybackSeconds(),
       });
 
+      suppressRemoteQueueReplace();
       store.removeTrack(state.currentTrackIndex);
       const nextState = getState();
       if (!nextState.playlist.length) {
@@ -794,6 +805,7 @@ export function createPlaybackController({ store, spotifyApi }) {
       clearTransitionTimers();
       stopConnectPolling();
       connectPreviousTrackUri = "";
+      suppressRemoteQueueReplace();
       store.clearPlaylist();
 
       if (getPlaybackMode() === "connect") {
